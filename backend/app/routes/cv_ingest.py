@@ -5,14 +5,67 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.core.config import get_settings
 from app.db import supabase
-from app.schemas.cv import CVIngestResponse, CVUploadResponse
-from app.services.cv_chunker import chunk_sections
+from app.schemas.cv import CVChunkItem, CVEmbeddedDataResponse, CVEmbeddedSection, CVIngestResponse, CVUploadResponse
+from app.services.cv_chunker import chunk_sections, extract_section_segments, infer_section_from_text
 from app.services.cv_parser import parse_file
 from app.services.embeddings import embed_texts
-from app.services.vector_store import add_embeddings
+from app.services.vector_store import add_embeddings, get_embeddings_by_source
 from app.utils.files import save_bytes_to_temp, save_upload_to_temp
 
 router = APIRouter(prefix="/cv", tags=["cv"])
+
+
+SECTION_ALIASES = {
+    "experience": {
+        "experience",
+        "work experience",
+        "professional experience",
+        "employment history",
+        "career history",
+        "professional background",
+    },
+    "education": {
+        "education",
+        "education and training",
+        "academic background",
+        "academic history",
+        "qualifications",
+    },
+    "skills": {
+        "skills",
+        "technical skills",
+        "core skills",
+        "competencies",
+        "core competencies",
+    },
+    "projects": {
+        "projects",
+        "project experience",
+        "selected projects",
+        "project portfolio",
+    },
+    "summary": {
+        "summary",
+        "professional summary",
+        "profile",
+        "about",
+        "about me",
+    },
+    "certifications": {
+        "certifications",
+        "certificates",
+        "licenses",
+        "licenses and certifications",
+    },
+}
+
+
+def _normalize_section_name(section: str | None) -> str:
+    normalized = str(section or "general").strip().lower()
+    for canonical, aliases in SECTION_ALIASES.items():
+        if normalized == canonical or normalized in aliases:
+            return canonical
+    return normalized or "general"
 
 
 @router.post("/upload", response_model=CVUploadResponse)
@@ -109,3 +162,55 @@ async def ingest_cv(
                 os.remove(temp_path)
             except OSError:
                 pass
+
+
+@router.get("/embedded-data", response_model=CVEmbeddedDataResponse)
+async def get_cv_embedded_data(file_id: str):
+    if not file_id.strip():
+        raise HTTPException(status_code=400, detail="file_id is required")
+
+    result = get_embeddings_by_source(file_id)
+    documents = result.get("documents", [])
+    metadatas = result.get("metadatas", [])
+
+    if not documents:
+        raise HTTPException(status_code=404, detail="Embedded CV data not found")
+
+    section_order = ["experience", "education", "skills", "projects", "summary", "certifications", "general"]
+    grouped: dict[str, list[CVChunkItem]] = {}
+
+    for document, metadata in zip(documents, metadatas):
+        section = _normalize_section_name(metadata.get("section") if isinstance(metadata, dict) else None)
+        document_text = str(document or "")
+        segments = extract_section_segments(document_text)
+
+        if segments:
+            for segment in segments:
+                segment_section = _normalize_section_name(segment["section"])
+                grouped.setdefault(segment_section, []).append(
+                    CVChunkItem(section=segment_section, content=segment["text"])
+                )
+            continue
+
+        if section == "general":
+            section = infer_section_from_text(document_text, fallback=section)
+
+        grouped.setdefault(section, []).append(
+            CVChunkItem(section=section, content=document_text)
+        )
+
+    ordered_sections: list[CVEmbeddedSection] = []
+    for section in section_order:
+        items = grouped.pop(section, None)
+        if items:
+            ordered_sections.append(CVEmbeddedSection(section=section, items=items))
+
+    for section in sorted(grouped.keys()):
+        ordered_sections.append(CVEmbeddedSection(section=section, items=grouped[section]))
+
+    return CVEmbeddedDataResponse(
+        file_id=file_id,
+        chunk_count=len(documents),
+        collection=result["collection"],
+        sections=ordered_sections,
+    )

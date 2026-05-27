@@ -21,3 +21,14 @@ def add_embeddings(
     ids = [str(uuid4()) for _ in texts]
     collection.add(ids=ids, documents=texts, embeddings=embeddings, metadatas=metadatas)
     return {"ids": ids, "collection": collection.name}
+
+
+def get_embeddings_by_source(source: str) -> dict:
+    collection = _get_collection()
+    result = collection.get(where={"source": source}, include=["documents", "metadatas"])
+    return {
+        "ids": result.get("ids", []),
+        "documents": result.get("documents", []),
+        "metadatas": result.get("metadatas", []),
+        "collection": collection.name,
+    }

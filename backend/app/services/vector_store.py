@@ -40,3 +40,27 @@ def get_embeddings_by_source(source: str) -> dict:
         "metadatas": result.get("metadatas", []),
         "collection": collection.name,
     }
+
+
+def query_embeddings(query_embedding: list[float], n_results: int = 8, source: str | None = None) -> dict:
+    collection = _get_collection()
+    where = {"source": source} if source else None
+    result = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=max(1, n_results),
+        where=where,
+        include=["documents", "metadatas", "distances"],
+    )
+
+    documents = (result.get("documents") or [[]])[0]
+    metadatas = (result.get("metadatas") or [[]])[0]
+    distances = (result.get("distances") or [[]])[0]
+    ids = (result.get("ids") or [[]])[0]
+
+    return {
+        "ids": ids,
+        "documents": documents,
+        "metadatas": metadatas,
+        "distances": distances,
+        "collection": collection.name,
+    }

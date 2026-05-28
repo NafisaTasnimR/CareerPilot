@@ -1,13 +1,21 @@
 from uuid import uuid4
 
 import chromadb
+from chromadb.config import Settings as ChromaSettings
 
 from app.core.config import get_settings
 
 
 def _get_collection():
     settings = get_settings()
-    client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
+    client = chromadb.PersistentClient(
+        path=settings.chroma_persist_dir,
+        settings=ChromaSettings(
+            is_persistent=True,
+            persist_directory=settings.chroma_persist_dir,
+            anonymized_telemetry=False,
+        ),
+    )
     return client.get_or_create_collection(name=settings.chroma_collection)
 
 

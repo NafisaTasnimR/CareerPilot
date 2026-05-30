@@ -132,6 +132,8 @@ Add:
 ```env
 SUPABASE_URL=your_supabase_url
 SUPABASE_SERVICE_KEY=your_service_role_key
+SUPABASE_BUCKET=cvs
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
 ## 5. Run backend

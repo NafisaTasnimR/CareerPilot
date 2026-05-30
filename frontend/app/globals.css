@@ -121,10 +121,86 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+
   html {
     @apply font-sans;
   }
+}
+
+.app-shell-main {
+  transition: margin-left 200ms ease;
+}
+
+.app-shell-sidebar {
+  width: 16rem;
+}
+
+@media (min-width: 768px) {
+  .app-shell-main {
+    margin-left: var(--sidebar-width);
+  }
+
+  .app-shell-sidebar {
+    width: var(--sidebar-width);
+  }
+}
+
+:root {
+  --cp-black: #2d2e2e;
+  --cp-panel: #242525;
+  --cp-panel-2: #2a2b2b;
+  --cp-panel-3: #303131;
+  --cp-border-600: #5b5c5c;
+  --cp-border-700: #4a4b4b;
+  --cp-border-800: #3a3b3b;
+  --cp-text-100: #ffffff;
+  --cp-text-200: #f2f2f2;
+  --cp-text-300: #dcdcdc;
+  --cp-text-400: #c0c0c0;
+  --cp-text-500: #a3a3a3;
+  --cp-text-600: #8a8a8a;
+}
+
+.text-white {
+  color: var(--cp-text-100);
+}
+
+.text-gray-100 {
+  color: var(--cp-text-200);
+}
+
+.text-gray-200 {
+  color: var(--cp-text-200);
+}
+
+.text-gray-300 {
+  color: var(--cp-text-300);
+}
+
+.text-gray-400 {
+  color: var(--cp-text-400);
+}
+
+.text-gray-500 {
+  color: var(--cp-text-500);
+}
+
+.text-gray-600 {
+  color: var(--cp-text-600);
+}
+
+.border-gray-800 {
+  border-color: var(--cp-border-800);
+}
+
+.border-gray-700 {
+  border-color: var(--cp-border-700);
+}
+
+.border-gray-600 {
+  border-color: var(--cp-border-600);
 }

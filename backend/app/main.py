@@ -3,10 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers import kanban, calendar, progress, nudges
 from app.scheduler import start_scheduler
 
+from app.routes.router import api_router
+
 app = FastAPI()
 
 origins = [
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
 
 app.add_middleware(
@@ -25,6 +28,7 @@ app.include_router(nudges.router)
 @app.on_event("startup")
 def startup():
     start_scheduler()
+app.include_router(api_router, prefix="/api")
 
 @app.get("/")
 def root():

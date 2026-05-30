@@ -8,6 +8,7 @@ backend/venv
 backend/__pycache__
 backend/.env
 backend/node_modules
+backend/chroma_data
 
 # Python
 *.pyc

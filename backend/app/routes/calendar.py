@@ -45,3 +45,15 @@ def create_task(task: TaskCreate, user_id: str):
 @router.patch("/tasks/{task_id}/complete")
 def complete_task(task_id: str, completed: bool):
     return supabase.table("tasks").update({"completed": completed}).eq("id", task_id).execute().data[0]
+
+@router.delete("/goals/{goal_id}")
+def delete_goal(goal_id: str):
+    # Delete tasks first (if no cascade set in DB)
+    supabase.table("tasks").delete().eq("goal_id", goal_id).execute()
+    supabase.table("goals").delete().eq("id", goal_id).execute()
+    return {"deleted": goal_id}
+
+@router.delete("/tasks/{task_id}")
+def delete_task(task_id: str):
+    supabase.table("tasks").delete().eq("id", task_id).execute()
+    return {"deleted": task_id}

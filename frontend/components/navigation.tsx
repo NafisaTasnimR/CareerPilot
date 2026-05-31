@@ -23,7 +23,7 @@ const navItems = [
     { href: '/jobs', label: 'Job Hunter', icon: Briefcase },
     { href: '/check-resume', label: 'Check Resume', icon: FileText },
     { href: '/assistant', label: 'AI Assistant', icon: Bot },
-    { href: '/track-progress', label: 'Track Progress', icon: LineChart },
+    { href: '/tracker', label: 'Track Progress', icon: LineChart },
     { href: '/settings', label: 'Settings', icon: Settings },
 ]
 

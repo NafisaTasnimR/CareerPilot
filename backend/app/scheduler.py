@@ -4,7 +4,7 @@ from app.db import supabase
 import anthropic
 import os
 
-client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+client = anthropic.Anthropic(api_key=os.getenv("GEMINI_API_KEY"))
 scheduler = BackgroundScheduler()
 
 def check_and_nudge():
@@ -18,7 +18,7 @@ def check_and_nudge():
         if uid not in latest or row["created_at"] > latest[uid]:
             latest[uid] = row["created_at"]
 
-    week_ago = (datetime.now() - timedelta(days=7)).isoformat()
+    week_ago = (datetime.now() - timedelta(days=1)).isoformat()
 
     for uid, last_applied in latest.items():
         if last_applied < week_ago:

@@ -1,12 +1,8 @@
 from fastapi import APIRouter
 from app.db import supabase
-import google.generativeai as genai
-import os
+from app.services.gemini import generate_text
 
 router = APIRouter(prefix="/nudges", tags=["nudges"])
-
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel("gemini-2.0-flash")
 
 @router.get("/")
 def get_nudges(user_id: str, seen: bool = None):
@@ -34,8 +30,7 @@ def generate_nudge(user_id: str):
 
     try:
         prompt = f"Generate a short motivational career nudge for someone with {total_apps} applications and {pending_goals} pending goals. 2 sentences max."
-        response = model.generate_content(prompt)
-        message = response.text.strip()
+        message = generate_text(prompt, model="gemini-2.0-flash")
     except Exception:
         # Fallback if quota exceeded
         if total_apps == 0:

@@ -2,14 +2,12 @@ import json
 import re
 from typing import Any
 
-import google.generativeai as genai
-
-from app.core.config import get_settings
 from app.services.cv_chunker import clean_section, detect_sections, infer_section_from_text, normalize_section_name
+from app.services.gemini import generate_text
 
 STRUCTURE_PROMPT = (
-    "You are a resume parser.\n"
-    "Convert the following resume text into structured JSON with sections:\n"
+    "You are a professional resume parser. Your goal is to convert raw resume text into a clean, structured JSON format.\n"
+    "Convert the following resume text into structured JSON with these exact sections:\n"
     "- name\n"
     "- contact\n"
     "- summary\n"
@@ -17,9 +15,14 @@ STRUCTURE_PROMPT = (
     "- experience\n"
     "- skills\n"
     "- projects\n"
-    "Return valid JSON only.\n"
-    "Use strings for short sections and arrays of strings for multi-line sections when helpful.\n"
-    "Keep the header block separate: put the person's name in name, email/phone/location/website in contact, and the profile paragraph in summary. Do not mix any of that into experience.\n"
+    "\n"
+    "CRITICAL GUIDELINES:\n"
+    "1. Return VALID JSON only. No conversational text.\n"
+    "2. For 'education', 'experience', 'skills', and 'projects', ALWAYS use an array of strings. Each string should be a distinct entry (e.g., one job, one degree, one skill group).\n"
+    "3. For 'skills', do not just put one long string. Break them into logical groups or individual skills (e.g., ['Python, Java', 'React, Next.js', 'AWS, Docker']).\n"
+    "4. Keep the header block separate: put the person's name in 'name', email/phone/location/website in 'contact', and the profile paragraph in 'summary'.\n"
+    "5. Ensure no information is lost, but format it cleanly.\n"
+    "\n"
     "Text:\n"
     "\"\"\"\n"
     "{raw_text}\n"
@@ -93,15 +96,10 @@ def _fallback_structured_resume(raw_text: str) -> dict[str, str]:
 
 
 def structure_resume_text(raw_text: str) -> dict[str, str]:
-    settings = get_settings()
-    genai.configure(api_key=settings.gemini_api_key)
-
     prompt = STRUCTURE_PROMPT.format(raw_text=raw_text.strip())
-    model = genai.GenerativeModel("gemini-3.5-flash")
 
     try:
-        response = model.generate_content(prompt)
-        response_text = getattr(response, "text", "") or ""
+        response_text = generate_text(prompt, model="gemini-3.5-flash")
         parsed = json.loads(_strip_json_fences(response_text))
         structured = _normalize_structured_resume(parsed)
         if structured:

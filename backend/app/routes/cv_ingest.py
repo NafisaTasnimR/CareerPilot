@@ -35,7 +35,7 @@ async def upload_cv(file: UploadFile = File(...)):
             {"content-type": file.content_type or "application/octet-stream"},
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail="Upload failed") from exc
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(exc)}") from exc
 
     error = None
     if isinstance(result, dict):

@@ -1,11 +1,9 @@
 import json
 import re
 
-import google.generativeai as genai
-
-from app.core.config import get_settings
 from app.services.cv_chunker import infer_section_from_text, normalize_section_name
 from app.services.embeddings import embed_texts
+from app.services.gemini import generate_text
 from app.services.vector_store import query_embeddings
 
 INTENT_JOB_FIT = "job_fit"
@@ -15,6 +13,13 @@ INTENT_COVER_LETTER = "cover_letter"
 INTENT_GENERAL = "general"
 
 _STRUCTURED_SECTIONS = ("experience", "skills", "education")
+
+STYLE_GUIDANCE = (
+    "Tone: friendly, warm, and concise. "
+    "If the user greets, makes small talk, or asks unrelated questions, "
+    "reply with a short friendly greeting and a reminder that you can only help "
+    "with CV, job search, and career topics, then invite a relevant question.\n"
+)
 
 
 def detect_intent(query: str) -> str:
@@ -98,6 +103,7 @@ def build_job_fit_prompt(structured_cv_context: dict[str, list[str]], query: str
     jd_text = (job_description or "").strip()
     return (
         "You are a career assistant. Evaluate candidate-job fit using CV context and job description.\n"
+        f"{STYLE_GUIDANCE}"
         "Return:\n"
         "1) Verdict: Ready / Almost Ready / Not Ready\n"
         "2) Reasoning grounded in CV evidence\n"
@@ -113,6 +119,7 @@ def build_skill_gap_prompt(structured_cv_context: dict[str, list[str]], query: s
     jd_text = (job_description or "").strip()
     return (
         "You are a career assistant. Perform skill gap analysis.\n"
+        f"{STYLE_GUIDANCE}"
         "Return:\n"
         "1) Missing skills grouped by: core technical, tools/platform, and soft skills\n"
         "2) Which CV evidence already maps to required skills\n"
@@ -127,6 +134,7 @@ def build_skill_gap_prompt(structured_cv_context: dict[str, list[str]], query: s
 def build_roadmap_prompt(structured_cv_context: dict[str, list[str]], query: str) -> str:
     return (
         "You are a career assistant. Build a practical 3-month roadmap to become job-ready.\n"
+        f"{STYLE_GUIDANCE}"
         "Return a week-by-week plan (12 weeks) with:\n"
         "- weekly objective\n"
         "- learning resources (courses/docs/videos)\n"
@@ -142,6 +150,7 @@ def build_cover_letter_prompt(structured_cv_context: dict[str, list[str]], query
     jd_text = (job_description or "").strip()
     return (
         "You are a career assistant. Draft a personalized cover letter.\n"
+        f"{STYLE_GUIDANCE}"
         "Requirements:\n"
         "- Use concrete candidate experience from the CV context\n"
         "- Align to the job description\n"
@@ -157,6 +166,7 @@ def build_general_prompt(structured_cv_context: dict[str, list[str]], query: str
     jd_text = (job_description or "").strip()
     return (
         "You are a career assistant. Answer with concise, evidence-based guidance grounded in the structured CV context.\n"
+        f"{STYLE_GUIDANCE}"
         "If information is missing, state assumptions explicitly.\n\n"
         f"User query: {query}\n\n"
         f"Job description context:\n{jd_text if jd_text else 'Not provided'}\n\n"
@@ -182,12 +192,7 @@ def build_prompt(
 
 
 def generate_response(prompt: str) -> str:
-    settings = get_settings()
-    genai.configure(api_key=settings.gemini_api_key)
-
-    model = genai.GenerativeModel("gemini-3.5-flash")
-    response = model.generate_content(prompt)
-    return (getattr(response, "text", "") or "").strip()
+    return generate_text(prompt, model="gemini-3.5-flash")
 
 
 def run_assistant_query(
@@ -195,9 +200,20 @@ def run_assistant_query(
     job_description: str | None = None,
     file_id: str | None = None,
     top_k: int = 8,
+    history: list[dict[str, str]] = None,
 ) -> tuple[str, str, dict[str, list[str]]]:
     intent = detect_intent(query)
     structured_cv_context = retrieve_structured_cv_context(query, file_id=file_id, top_k=top_k)
+    
+    # Format history for the prompt
+    history_text = ""
+    if history:
+        history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in history])
+    
+    # We modify the prompt to include history
     prompt = build_prompt(intent, query, structured_cv_context, job_description)
+    if history_text:
+        prompt = f"Conversation History:\n{history_text}\n\n{prompt}"
+        
     answer = generate_response(prompt)
     return intent, answer, structured_cv_context

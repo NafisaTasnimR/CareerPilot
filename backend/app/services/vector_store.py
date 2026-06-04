@@ -1,22 +1,42 @@
 from uuid import uuid4
 
-import chromadb
-from chromadb.config import Settings as ChromaSettings
-
-from app.core.config import get_settings
+from app.db import supabase
 
 
-def _get_collection():
-    settings = get_settings()
-    client = chromadb.PersistentClient(
-        path=settings.chroma_persist_dir,
-        settings=ChromaSettings(
-            is_persistent=True,
-            persist_directory=settings.chroma_persist_dir,
-            anonymized_telemetry=False,
-        ),
-    )
-    return client.get_or_create_collection(name=settings.chroma_collection)
+COLLECTION_NAME = "cv_embeddings"
+
+
+def _execute(query, error_message: str):
+    try:
+        result = query.execute()
+    except Exception as exc:
+        raise ValueError(f"{error_message}: {exc}") from exc
+
+    error = getattr(result, "error", None)
+    if error:
+        raise ValueError(f"{error_message}: {error}")
+
+    return result
+
+
+def _as_rows(result) -> list[dict]:
+    data = getattr(result, "data", None)
+    if isinstance(data, list):
+        return [row for row in data if isinstance(row, dict)]
+    if isinstance(data, dict):
+        return [data]
+    return []
+
+
+def _row_to_metadata(row: dict) -> dict:
+    metadata = {
+        "source": row.get("source"),
+        "section": row.get("section"),
+    }
+    candidate_id = row.get("candidate_id")
+    if candidate_id is not None:
+        metadata["candidate_id"] = candidate_id
+    return metadata
 
 
 def add_embeddings(
@@ -24,43 +44,73 @@ def add_embeddings(
 ) -> dict:
     if len(texts) != len(embeddings):
         raise ValueError("Texts and embeddings length mismatch")
+    if len(texts) != len(metadatas):
+        raise ValueError("Texts and metadata length mismatch")
 
-    collection = _get_collection()
-    ids = [str(uuid4()) for _ in texts]
-    collection.add(ids=ids, documents=texts, embeddings=embeddings, metadatas=metadatas)
-    return {"ids": ids, "collection": collection.name}
+    rows = []
+    ids = []
+    for text, embedding, metadata in zip(texts, embeddings, metadatas):
+        source = (metadata or {}).get("source")
+        section = (metadata or {}).get("section")
+        if not source:
+            raise ValueError("source is required for each embedding row")
+        if not section:
+            raise ValueError("section is required for each embedding row")
+
+        row_id = str(uuid4())
+        ids.append(row_id)
+        rows.append(
+            {
+                "id": row_id,
+                "source": source,
+                "section": section,
+                "candidate_id": (metadata or {}).get("candidate_id"),
+                "content": text,
+                "embedding": embedding,
+            }
+        )
+
+    _execute(
+        supabase.table(COLLECTION_NAME).insert(rows),
+        "Failed to insert embeddings into Supabase",
+    )
+    return {"ids": ids, "collection": COLLECTION_NAME}
 
 
 def get_embeddings_by_source(source: str) -> dict:
-    collection = _get_collection()
-    result = collection.get(where={"source": source}, include=["documents", "metadatas"])
+    result = _execute(
+        supabase.table(COLLECTION_NAME)
+        .select("id, source, section, candidate_id, content")
+        .eq("source", source)
+        .order("created_at", desc=False),
+        f"Failed to fetch embeddings for source {source}",
+    )
+
+    rows = _as_rows(result)
     return {
-        "ids": result.get("ids", []),
-        "documents": result.get("documents", []),
-        "metadatas": result.get("metadatas", []),
-        "collection": collection.name,
+        "ids": [row.get("id") for row in rows if row.get("id")],
+        "documents": [row.get("content", "") for row in rows],
+        "metadatas": [_row_to_metadata(row) for row in rows],
+        "collection": COLLECTION_NAME,
     }
 
 
 def query_embeddings(query_embedding: list[float], n_results: int = 8, source: str | None = None) -> dict:
-    collection = _get_collection()
-    where = {"source": source} if source else None
-    result = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=max(1, n_results),
-        where=where,
-        include=["documents", "metadatas", "distances"],
+    params = {
+        "query_embedding": query_embedding,
+        "match_count": max(1, n_results),
+        "filter_source": source,
+    }
+    result = _execute(
+        supabase.rpc("match_cv_embeddings", params),
+        "Failed to query Supabase vector matches",
     )
 
-    documents = (result.get("documents") or [[]])[0]
-    metadatas = (result.get("metadatas") or [[]])[0]
-    distances = (result.get("distances") or [[]])[0]
-    ids = (result.get("ids") or [[]])[0]
-
+    rows = _as_rows(result)
     return {
-        "ids": ids,
-        "documents": documents,
-        "metadatas": metadatas,
-        "distances": distances,
-        "collection": collection.name,
+        "ids": [row.get("id") for row in rows if row.get("id")],
+        "documents": [row.get("content", "") for row in rows],
+        "metadatas": [_row_to_metadata(row) for row in rows],
+        "distances": [row.get("distance") for row in rows],
+        "collection": COLLECTION_NAME,
     }

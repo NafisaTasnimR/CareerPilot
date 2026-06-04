@@ -8,8 +8,9 @@ import {
     Zap,
     AlertCircle,
     Loader2,
-    Check,
     RefreshCcw,
+    ChevronDown,
+    ChevronUp,
 } from 'lucide-react'
 import { getBackendUrl } from '@/lib/backend'
 
@@ -45,6 +46,81 @@ function normalizeSectionKey(section: string) {
     return entry?.[0] ?? normalized
 }
 
+const SUMMARY_LIMIT = 160
+
+function summarizeContent(text: string, limit: number = SUMMARY_LIMIT) {
+    const cleaned = text.replace(/\s+/g, ' ').trim()
+    if (!cleaned) return ''
+    if (cleaned.length <= limit) return cleaned
+
+    // Try to find a natural sentence end
+    const sentenceEnd = cleaned.search(/[.!?]/)
+    if (sentenceEnd > 40 && sentenceEnd < limit) {
+        return cleaned.slice(0, sentenceEnd + 1)
+    }
+
+    return `${cleaned.slice(0, limit).trim()}...`
+}
+
+function formatParsedContent(text: string) {
+    // Split by common delimiters that indicate new entries or bullet points
+    // This helps avoid the "blob of text" look seen in the screenshot
+    const lines = text.split(/\n|EXPERIENCE|EDUCATION|SKILLS|PROJECTS/i)
+        .map(line => line.trim())
+        .filter(Boolean)
+
+    return lines.map(line => {
+        // Handle bullet points explicitly
+        if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) {
+            return (
+                <div key={`bullet-${line}`} className="flex gap-2 mb-1">
+                    <span className="text-white/40">•</span>
+                    <p className="text-white/70">{line.substring(1).trim()}</p>
+                </div>
+            )
+        }
+        // If the line starts with a common label like "title:" or "degree:", 
+        // we can make it look better
+        if (line.toLowerCase().startsWith('title:') || line.toLowerCase().startsWith('degree:')) {
+            return <p key={`label-${line}`} className="text-white font-medium mb-1">{line}</p>
+        }
+        return <p key={`text-${line}`} className="text-white/70 mb-1">{line}</p>
+    })
+}
+
+function extractSkillTags(items: CVParsedItem[], maxTags = 12) {
+    const tags: string[] = []
+    const seen = new Set<string>()
+
+    items.forEach((item) => {
+        const cleaned = (item.content || '')
+            .replace(/\u2022/g, ' ')
+            .replace(/[()]/g, ' ')
+        cleaned
+            .split(/[,/;|\n]/)
+            .map((token) => token.replace(/\s+/g, ' ').trim())
+            .filter(Boolean)
+            .forEach((token) => {
+                if (tags.length >= maxTags) return
+                if (token.length > 36) return
+                if (token.split(' ').length > 4) return
+                const key = token.toLowerCase()
+                if (seen.has(key)) return
+                seen.add(key)
+                tags.push(token)
+            })
+    })
+
+    return tags
+}
+
+function getHighlights(items: CVParsedItem[], maxItems = 3) {
+    return items.slice(0, maxItems).map((item) => ({
+        label: item.section || 'Highlight',
+        summary: summarizeContent(item.content),
+    }))
+}
+
 interface DashboardProps {
     fileId: string
     fileName: string
@@ -73,6 +149,8 @@ export default function DashboardContent({
         skills: [],
         projects: [],
     })
+    const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
+    const [pagination, setPagination] = useState({ limit: 50, offset: 0 })
 
     useEffect(() => {
         let cancelled = false
@@ -83,8 +161,14 @@ export default function DashboardContent({
 
             try {
                 const backendUrl = getBackendUrl()
+                // Use pagination to prevent huge responses
+                const queryParams = new URLSearchParams({
+                    file_id: fileId,
+                    limit: pagination.limit.toString(),
+                    offset: pagination.offset.toString(),
+                })
                 const response = await fetch(
-                    `${backendUrl}/api/cv/embedded-data?file_id=${encodeURIComponent(fileId)}`
+                    `${backendUrl}/api/cv/embedded-data?${queryParams}`
                 )
 
                 if (!response.ok) {
@@ -107,7 +191,8 @@ export default function DashboardContent({
                 data.sections.forEach((section) => {
                     const sectionKey = normalizeSectionKey(section.section) as keyof typeof nextParsedData
                     if (sectionKey in nextParsedData) {
-                        nextParsedData[sectionKey] = section.items
+                        // Filter out empty items to ensure count is accurate
+                        nextParsedData[sectionKey] = section.items.filter(item => item.content && item.content.trim().length > 0)
                     }
                 })
 
@@ -136,7 +221,7 @@ export default function DashboardContent({
         return () => {
             cancelled = true
         }
-    }, [fileId])
+    }, [fileId, pagination])
 
     const sectionConfig = [
         {
@@ -161,6 +246,15 @@ export default function DashboardContent({
         },
     ]
 
+    const skillTags = extractSkillTags(parsedData.skills)
+
+    const toggleSection = (key: string) => {
+        setExpandedSections((prev) => ({
+            ...prev,
+            [key]: !prev[key],
+        }))
+    }
+
     if (loading) {
         return (
             <div className="flex items-center justify-center py-20">
@@ -184,6 +278,7 @@ export default function DashboardContent({
                     </p>
                     <p className="text-xs text-white/50">
                         {collection ? `Indexed in ${collection}` : 'Live embedded data'}
+                        {` • ${liveChunkCount} chunks indexed`}
                     </p>
                 </div>
                 <button
@@ -210,19 +305,26 @@ export default function DashboardContent({
                 <div className="rounded-xl border border-white/15 bg-[#171717] p-5">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-white/60 text-sm">Chunks extracted</p>
-                            <p className="text-2xl font-semibold text-white mt-2">
-                                {liveChunkCount}
-                            </p>
+                            <p className="text-white/60 text-sm">Experience entries</p>
+                            <p className="text-2xl font-semibold text-white mt-2">{parsedData.experience.length}</p>
                         </div>
-                        <Zap className="w-6 h-6 text-white/45" />
+                        <Briefcase className="w-6 h-6 text-white/45" />
                     </div>
                 </div>
                 <div className="rounded-xl border border-white/15 bg-[#171717] p-5">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-white/60 text-sm">Sections</p>
-                            <p className="text-2xl font-semibold text-white mt-2">4</p>
+                            <p className="text-white/60 text-sm">Education entries</p>
+                            <p className="text-2xl font-semibold text-white mt-2">{parsedData.education.length}</p>
+                        </div>
+                        <BookOpen className="w-6 h-6 text-white/45" />
+                    </div>
+                </div>
+                <div className="rounded-xl border border-white/15 bg-[#171717] p-5">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-white/60 text-sm">Skill tags</p>
+                            <p className="text-2xl font-semibold text-white mt-2">{skillTags.length}</p>
                         </div>
                         <Code className="w-6 h-6 text-white/45" />
                     </div>
@@ -230,19 +332,10 @@ export default function DashboardContent({
                 <div className="rounded-xl border border-white/15 bg-[#171717] p-5">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-white/60 text-sm">Indexed</p>
-                            <p className="text-2xl font-semibold text-white mt-2">Yes</p>
+                            <p className="text-white/60 text-sm">Projects</p>
+                            <p className="text-2xl font-semibold text-white mt-2">{parsedData.projects.length}</p>
                         </div>
-                        <Check className="w-6 h-6 text-white/45" />
-                    </div>
-                </div>
-                <div className="rounded-xl border border-white/15 bg-[#171717] p-5">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-white/60 text-sm">Ready</p>
-                            <p className="text-2xl font-semibold text-white mt-2">Yes</p>
-                        </div>
-                        <BookOpen className="w-6 h-6 text-white/45" />
+                        <Zap className="w-6 h-6 text-white/45" />
                     </div>
                 </div>
             </div>
@@ -252,6 +345,9 @@ export default function DashboardContent({
                     const Icon = section.icon
                     const data =
                         parsedData[section.key as keyof typeof parsedData] || []
+                    const isExpanded = Boolean(expandedSections[section.key])
+                    const highlights = getHighlights(data, 3)
+                    const isSkills = section.key === 'skills'
 
                     return (
                         <div
@@ -260,32 +356,91 @@ export default function DashboardContent({
                         >
                             <div className="border-b border-white/10 px-5 py-4 flex items-center gap-3 bg-[#141414]">
                                 <Icon className="w-4 h-4 text-white/60" />
-                                <h2 className="text-white font-semibold text-sm">
-                                    {section.title}
-                                </h2>
-                                <span className="ml-auto bg-[#232323] text-white/70 text-xs font-medium px-2 py-1 rounded">
-                                    {data.length}
-                                </span>
+                                <div>
+                                    <h2 className="text-white font-semibold text-sm">
+                                        {section.title}
+                                    </h2>
+                                    <p className="text-xs text-white/50">{data.length} entries</p>
+                                </div>
+                                {data.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleSection(section.key)}
+                                        className="ml-auto inline-flex items-center gap-1 text-xs text-white/70 hover:text-white transition-colors"
+                                    >
+                                        {isExpanded ? 'Hide details' : 'Show details'}
+                                        {isExpanded ? (
+                                            <ChevronUp className="w-3.5 h-3.5" />
+                                        ) : (
+                                            <ChevronDown className="w-3.5 h-3.5" />
+                                        )}
+                                    </button>
+                                )}
                             </div>
 
                             <div className="p-5">
                                 {data.length > 0 ? (
-                                    <ul className="space-y-4">
-                                        {data.map((item, idx) => (
-                                            <li key={idx} className="space-y-1">
-                                                <p className="font-medium text-white">
-                                                    {item.section}
-                                                </p>
-                                                <p className="text-white/70 text-sm leading-relaxed">
-                                                    {item.content}
-                                                </p>
-                                            </li>
-                                        ))}
-                                    </ul>
+                                    <div className="space-y-4">
+                                        {isSkills ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {skillTags.length > 0 ? (
+                                                    skillTags
+                                                        .slice(0, isExpanded ? 18 : 12)
+                                                        .map((tag) => (
+                                                            <span
+                                                                key={tag}
+                                                                className="rounded-full border border-white/10 bg-[#202020] px-3 py-1 text-xs text-white/80"
+                                                            >
+                                                                {tag}
+                                                            </span>
+                                                        ))
+                                                ) : (
+                                                    <p className="text-white/50 text-sm">
+                                                        No skills found in your resume
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                {highlights.map((highlight, idx) => (
+                                                    <div key={`${section.key}-highlight-${idx}`} className="p-3 rounded-lg bg-white/5 border border-white/5 space-y-1">
+                                                        <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
+                                                            {highlight.label}
+                                                        </p>
+                                                        <p className="text-white/80 text-sm leading-relaxed">
+                                                            {highlight.summary}
+                                                        </p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {isExpanded && (
+                                            <div className="pt-4 border-t border-white/10 space-y-6">
+                                                {data.map((item, idx) => (
+                                                    <div key={`${section.key}-detail-${idx}`} className="space-y-2">
+                                                        {item.section && (
+                                                            <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
+                                                                {item.section}
+                                                            </p>
+                                                        )}
+                                                        <div className="text-sm leading-relaxed whitespace-pre-line">
+                                                            {formatParsedContent(item.content).map((element, i) => (
+                                                                <div key={`${section.key}-content-${idx}-${i}`}>
+                                                                    {element}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 ) : (
-                                    <p className="text-white/50 text-sm">
-                                        No {section.title.toLowerCase()} found in your resume
-                                    </p>
+                                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                                        <Icon className="w-8 h-8 text-white/20 mb-2" />
+                                        <p className="text-white/40 text-sm">No {section.title.toLowerCase()} found</p>
+                                    </div>
                                 )}
                             </div>
                         </div>

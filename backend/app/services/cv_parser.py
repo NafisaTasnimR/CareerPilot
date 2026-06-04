@@ -66,8 +66,21 @@ def _group_words_into_lines(words: list[dict[str, Any]], y_tolerance: float = 4.
 def extract_pdf_structured(file_path: str) -> list[str]:
     text_blocks: list[str] = []
 
+    # Resource Guard: Check file size before processing (e.g., max 10MB)
+    import os
+    file_size = os.path.getsize(file_path)
+    if file_size > 10 * 1024 * 1024:
+        raise ValueError("PDF file is too large. Maximum size allowed is 10MB.")
+
     with pdfplumber.open(file_path) as pdf:
-        for page in pdf.pages:
+        # Resource Guard: Limit number of pages to process (e.g., max 10 pages)
+        if len(pdf.pages) > 10:
+            # We only process the first 10 pages to prevent OOM
+            pages_to_process = pdf.pages[:10]
+        else:
+            pages_to_process = pdf.pages
+
+        for page in pages_to_process:
             words = page.extract_words(use_text_flow=True) or []
             lines = _group_words_into_lines([word for word in words if _word_text(word)])
 

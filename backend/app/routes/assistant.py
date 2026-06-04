@@ -18,6 +18,7 @@ def assistant(req: QueryRequest):
             job_description=req.job_description,
             file_id=req.file_id,
             top_k=req.top_k,
+            history=req.history,
         )
         return AssistantResponse(
             intent=intent,

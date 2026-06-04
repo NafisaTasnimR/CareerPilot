@@ -6,6 +6,7 @@ class QueryRequest(BaseModel):
     job_description: str | None = None
     file_id: str | None = None
     top_k: int = Field(default=8, ge=1, le=20)
+    history: list[dict[str, str]] = Field(default_factory=list)
 
 
 class AssistantResponse(BaseModel):

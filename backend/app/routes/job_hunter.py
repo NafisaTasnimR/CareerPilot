@@ -5,6 +5,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from groq import Groq
+from google import genai as google_genai
 
 from app.services.embeddings import embed_texts
 from app.services.vector_store import query_embeddings, get_embeddings_by_source
@@ -14,10 +15,24 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 JSEARCH_API_KEY = os.getenv("JSEARCH_API_KEY")
 JSEARCH_URL = "https://api.openwebninja.com/jsearch/search-v2"
 
+# In-memory cache for job feed
+_feed_cache: dict[str, list[dict]] = {}
+
+# Two separate clients — Gemini for scoring, Groq for feed
+_gemini_client = None
 _groq_client = None
 
 
-def _get_client() -> Groq:
+def _get_gemini_client() -> google_genai.Client:
+    global _gemini_client
+    if _gemini_client is None:
+        key = os.getenv("GEMINI_API_KEY_JOBS")
+        print(f"INIT gemini client with key: {key[:12] if key else 'NONE'}")
+        _gemini_client = google_genai.Client(api_key=key)
+    return _gemini_client
+
+
+def _get_groq_client() -> Groq:
     global _groq_client
     if _groq_client is None:
         key = os.getenv("GROQ_API_KEY")
@@ -35,6 +50,7 @@ def _extract_json(raw: str) -> dict:
 
 
 def _generate_analysis(cv_context: str, title: str, company: str, description: str) -> dict:
+    """Uses Gemini 3.5 Flash for fit scoring and skill gap detection."""
     prompt = f"""You are a strict career advisor scoring a CV against a specific job.
 
 JOB: {title} at {company}
@@ -63,16 +79,14 @@ Score strictly based on THIS job's specific requirements:
 - 40-54: Partial match, missing several specific requirements
 - <40: Poor match for this specific role
 
-Return ONLY this JSON:
+Return ONLY this JSON, no markdown:
 {{"fit_score": <integer, NOT a decimal, vary it based on the specific job>, "fit_reason": "<name specific skills from CV that match THIS job's requirements, and the main specific gap>", "missing_skills": ["<only skills explicitly in the job description that are absent from CV, max 3, empty [] if score 85+>"]}}"""
 
-    response = _get_client().chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=250,
-        temperature=0.6,
+    response = _get_gemini_client().models.generate_content(
+        model="gemini-3.5-flash",
+        contents=prompt,
     )
-    raw = response.choices[0].message.content.strip()
+    raw = (getattr(response, "text", "") or "").strip()
     result = _extract_json(raw)
 
     if not isinstance(result.get("missing_skills"), list):
@@ -83,6 +97,43 @@ Return ONLY this JSON:
     ][:3]
 
     return result
+
+
+def _generate_feed_roles(cv_context: str) -> list[dict]:
+    """Uses Groq llama-3.1-8b-instant for feed role recommendations."""
+    prompt = f"""You are a career advisor. Based on this CV, suggest the 3 best-fit job roles for this candidate.
+
+CV:
+{cv_context[:2000]}
+
+Return ONLY a JSON array with exactly 3 objects. Each object has:
+- "title": the exact job title as it appears on job boards (e.g. "Senior Graphic Designer", "UX Designer", "Data Analyst") — use industry-standard titles, not paraphrases
+- "reason": one sentence why this role fits the CV
+- "match_score": integer 0-100 based on how well the CV matches this role type
+
+Example:
+[
+  {{"title": "NLP Engineer", "reason": "Published NLP research and Python/ML experience align strongly.", "match_score": 88}},
+  {{"title": "ML Engineer", "reason": "Stanford ML cert and scikit-learn experience are directly relevant.", "match_score": 82}},
+  {{"title": "Backend Developer", "reason": "FastAPI and PostgreSQL experience cover core backend requirements.", "match_score": 71}}
+]
+
+Return ONLY the JSON array, no markdown."""
+
+    response = _get_groq_client().chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=400,
+        temperature=0.4,
+    )
+    raw = response.choices[0].message.content.strip()
+    clean = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
+    match = re.search(r'\[.*\]', clean, re.DOTALL)
+    roles = json.loads(match.group() if match else clean)
+    if not isinstance(roles, list):
+        raise ValueError("Not a list")
+    return roles[:3]
+
 
 # ── Pydantic models ────────────────────────────────────────────────────────────
 
@@ -181,6 +232,32 @@ async def search_jobs(req: JobSearchRequest):
     return await _score_jobs(raw_jobs, cv_context)
 
 
+@router.get("/feed")
+async def get_job_feed(file_id: str):
+    """
+    Returns 3 recommended roles based on the CV using Groq 8b.
+    Cached in memory — only called once per CV upload.
+    """
+    if not file_id:
+        raise HTTPException(status_code=400, detail="file_id required")
+
+    if file_id in _feed_cache:
+        return _feed_cache[file_id]
+
+    cv_context = await _get_full_cv(file_id)
+    if cv_context == "No CV context available.":
+        raise HTTPException(status_code=404, detail="CV not found. Run /cv/ingest first.")
+
+    try:
+        roles = _generate_feed_roles(cv_context)
+    except Exception as e:
+        print(f"Feed error: {e}")
+        raise HTTPException(status_code=500, detail="Could not generate recommendations.")
+
+    _feed_cache[file_id] = roles
+    return roles
+
+
 @router.post("/save")
 async def save_job(req: SaveJobRequest):
     """Save a job to the Kanban application tracker."""
@@ -267,7 +344,7 @@ async def _get_cv_context(query: str, file_id: str) -> str:
 async def _score_jobs(raw_jobs: list[dict], cv_context: str) -> list[JobCard]:
     results = []
 
-    for job in raw_jobs[:8]:
+    for job in raw_jobs[:5]:
         title       = job.get("job_title", "Untitled")
         company     = job.get("employer_name", "Unknown")
         location    = f"{job.get('job_city') or ''} {job.get('job_country') or ''}".strip()

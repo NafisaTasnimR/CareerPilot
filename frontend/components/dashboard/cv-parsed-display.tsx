@@ -506,7 +506,7 @@ export default function DashboardContent({
                                                                 {item.section}
                                                             </p>
                                                         )}
-                                                        <div className="text-sm leading-relaxed whitespace-pre-line">
+                                                        <div className="text-sm leading-relaxed">
                                                             {formatParsedContent(item.content).map((element, i) => (
                                                                 <div key={`${section.key}-content-${idx}-${i}`}>
                                                                     {element}

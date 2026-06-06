@@ -5,7 +5,7 @@ import AppShell from '@/components/app-shell'
 import {
     Briefcase, Search, ExternalLink, Loader2,
     AlertCircle, SlidersHorizontal, MapPin,
-    Clock, Building2, Banknote, Calendar, X, Bookmark, BookmarkCheck
+    Clock, Building2, Banknote, Calendar, X
 } from 'lucide-react'
 import { getBackendUrl } from '@/lib/backend'
 
@@ -26,12 +26,12 @@ type JobCard = {
 }
 
 const SUGGESTED_QUERIES = [
-    'Junior Python developer Dhaka',
-    'NLP engineer remote',
-    'Machine learning engineer Bangladesh',
-    'Junior software engineer Python Dhaka',
-    'Data scientist remote',
-    'AI engineer Bangladesh',
+    'Python developer Dhaka',
+    'Frontend React engineer remote',
+    'ML internship Bangladesh',
+    'Full stack developer Dhaka',
+    'Data analyst remote',
+    'Backend engineer Bangladesh',
 ]
 
 function FitScoreRing({ score }: { score: number }) {
@@ -153,34 +153,16 @@ function JobCardItem({ job, userId }: { job: JobCard; userId: string | null }) {
 
     return (
         <div className="group rounded-xl border border-[#3a3b3b] bg-[#1f2020] hover:border-[#4a4b4b] hover:bg-[#222323] transition-all duration-200">
-            {/* Top section — no avatar, save icon in top right */}
+            {/* Top section */}
             <div className="p-5 pb-4">
-                <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                            <h3 className="text-white font-semibold text-sm leading-snug">
-                                {job.title}
-                            </h3>
-                            {/* Save icon button */}
-                            <button
-                                onClick={handleSave}
-                                disabled={saving || saved || !userId}
-                                className={`shrink-0 p-1.5 rounded-lg border transition-all duration-150 ${
-                                    saved
-                                        ? 'text-emerald-400 bg-emerald-950/30 border-emerald-900/40 cursor-default'
-                                        : 'text-gray-500 hover:text-white bg-transparent hover:bg-[#2a2b2b] border-transparent hover:border-[#3a3b3b]'
-                                } disabled:opacity-40`}
-                                title={saved ? 'Saved to tracker' : 'Save to tracker'}
-                            >
-                                {saving ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : saved ? (
-                                    <BookmarkCheck className="w-4 h-4" />
-                                ) : (
-                                    <Bookmark className="w-4 h-4" />
-                                )}
-                            </button>
-                        </div>
+                <div className="flex items-start gap-4">
+                    <div className="w-11 h-11 rounded-xl bg-[#2a2b2b] border border-[#3a3b3b] flex items-center justify-center shrink-0 text-base font-bold text-gray-300">
+                        {job.company.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0 pt-0.5">
+                        <h3 className="text-white font-semibold text-sm leading-snug">
+                            {job.title}
+                        </h3>
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                             <span className="flex items-center gap-1 text-xs text-gray-400">
                                 <Building2 className="w-3 h-3 text-gray-600" />
@@ -261,31 +243,45 @@ function JobCardItem({ job, userId }: { job: JobCard; userId: string | null }) {
                 )}
 
                 {/* Strong match — no gaps */}
-                {job.missing_skills && job.missing_skills.length === 0 && job.fit_score >= 80 && (
-                    <span className="inline-flex text-[11px] text-emerald-400 bg-emerald-950/30 border border-emerald-900/40 rounded-md px-2 py-0.5">
-                        ✓ Strong profile match — no major gaps
-                    </span>
-                )}
-
-                {/* Moderate — no gaps identified */}
-                {job.missing_skills && job.missing_skills.length === 0 && job.fit_score < 80 && (
-                    <span className="inline-flex text-[11px] text-gray-400 bg-[#2a2b2b] border border-[#3a3b3b] rounded-md px-2 py-0.5">
-                        No specific skill gaps identified
-                    </span>
+                {job.missing_skills && job.missing_skills.length === 0 && job.fit_score >= 75 && (
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-emerald-400 bg-emerald-950/30 border border-emerald-900/40 rounded-md px-2 py-0.5">
+                            ✓ Strong profile match — no major gaps
+                        </span>
+                    </div>
                 )}
             </div>
 
             {/* Footer */}
             <div className="px-5 pb-4 flex items-center justify-between">
-                <a
-                    href={job.redirect_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-white bg-[#2a2b2b] hover:bg-[#303131] border border-[#4a4b4b] hover:border-[#5b5c5c] rounded-lg px-4 py-2 transition-all duration-150 font-medium"
-                >
-                    Apply now
-                    <ExternalLink className="w-3 h-3" />
-                </a>
+                <div className="flex items-center gap-2">
+                    <a
+                        href={job.redirect_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-white bg-[#2a2b2b] hover:bg-[#303131] border border-[#4a4b4b] hover:border-[#5b5c5c] rounded-lg px-4 py-2 transition-all duration-150 font-medium"
+                    >
+                        Apply now
+                        <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <button
+                        onClick={handleSave}
+                        disabled={saving || saved || !userId}
+                        className={`inline-flex items-center gap-1.5 text-xs border rounded-lg px-4 py-2 transition-all duration-150 font-medium ${
+                            saved
+                                ? 'text-emerald-400 bg-emerald-950/30 border-emerald-900/40 cursor-default'
+                                : 'text-gray-400 bg-[#2a2b2b] hover:bg-[#303131] border-[#3a3b3b] hover:border-[#4a4b4b] hover:text-white'
+                        } disabled:opacity-40`}
+                    >
+                        {saving ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : saved ? (
+                            '✓ Saved'
+                        ) : (
+                            '+ Save'
+                        )}
+                    </button>
+                </div>
                 {sourceHost && (
                     <span className="text-[10px] text-gray-600">
                         via {sourceHost}
@@ -490,6 +486,7 @@ export default function JobsPage() {
                                 className="rounded-xl border border-[#3a3b3b] bg-[#1f2020] p-5 animate-pulse space-y-3"
                             >
                                 <div className="flex gap-4">
+                                    <div className="w-11 h-11 rounded-xl bg-[#2a2b2b]" />
                                     <div className="flex-1 space-y-2 pt-1">
                                         <div className="h-3.5 bg-[#2a2b2b] rounded w-2/3" />
                                         <div className="h-3 bg-[#2a2b2b] rounded w-1/3" />

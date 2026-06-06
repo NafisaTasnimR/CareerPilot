@@ -1,31 +1,25 @@
-"use client"
+'use client'
 
-import { useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase"
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function Home() {
-  const [message, setMessage] = useState("Loading...")
+    const router = useRouter()
 
-  useEffect(() => {
-    async function fetchData() {
-      const { data, error } = await supabase
-        .from("test")
-        .select("*")
+    useEffect(() => {
+        const stored = localStorage.getItem('userCV')
+        if (stored) {
+            try {
+                JSON.parse(stored)
+                router.replace('/dashboard')
+            } catch {
+                router.replace('/cv-upload')
+            }
+        } else {
+            router.replace('/cv-upload')
+        }
+    }, [router])
 
-      if (error) {
-        console.log(error)
-        setMessage("Error connecting to Supabase")
-      } else {
-        setMessage(data[0].message)
-      }
-    }
-
-    fetchData()
-  }, [])
-
-  return (
-    <div className="p-10 text-2xl">
-      {message}
-    </div>
-  )
+    // Show nothing while redirecting
+    return null
 }

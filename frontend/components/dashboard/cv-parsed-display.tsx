@@ -135,7 +135,7 @@ function JobFeedWidget({ fileId }: { fileId: string }) {
                     setRoles(JSON.parse(cached))
                     setLoading(false)
                     return
-                } catch {}
+                } catch { }
             }
 
             try {
@@ -181,7 +181,7 @@ function JobFeedWidget({ fileId }: { fileId: string }) {
                 </div>
             )}
 
-            {/* Role cards — no link, no hover, just display */}
+            {/* Role cards */}
             {!loading && !error && roles.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {roles.map((role, i) => (
@@ -481,8 +481,51 @@ export default function DashboardContent({
                                                         No skills found in your resume
                                                     </p>
                                                 )}
+                                                {isExpanded && (
+                                                    <div className="w-full pt-4 border-t border-white/10 space-y-3">
+                                                        {data.map((item, idx) => (
+                                                            <div
+                                                                key={`${section.key}-detail-${idx}`}
+                                                                className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3"
+                                                            >
+                                                                <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-2">
+                                                                    {section.title} {idx + 1}
+                                                                </p>
+                                                                <div className="text-sm leading-relaxed space-y-1">
+                                                                    {formatParsedContent(item.content).map((element, i) => (
+                                                                        <div key={`${section.key}-content-${idx}-${i}`}>
+                                                                            {element}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : isExpanded ? (
+                                            // When expanded — show only the detailed cards, NOT the highlights
+                                            <div className="space-y-3">
+                                                {data.map((item, idx) => (
+                                                    <div
+                                                        key={`${section.key}-detail-${idx}`}
+                                                        className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3 space-y-2"
+                                                    >
+                                                        <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
+                                                            {section.title} {idx + 1}
+                                                        </p>
+                                                        <div className="text-sm leading-relaxed space-y-1">
+                                                            {formatParsedContent(item.content).map((element, i) => (
+                                                                <div key={`${section.key}-content-${idx}-${i}`}>
+                                                                    {element}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
                                         ) : (
+                                            // When collapsed — show only the highlights preview
                                             <div className="space-y-4">
                                                 {highlights.map((highlight, idx) => (
                                                     <div key={`${section.key}-highlight-${idx}`} className="p-3 rounded-lg bg-white/5 border border-white/5 space-y-1">
@@ -492,27 +535,6 @@ export default function DashboardContent({
                                                         <p className="text-white/80 text-sm leading-relaxed">
                                                             {highlight.summary}
                                                         </p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {isExpanded && (
-                                            <div className="pt-4 border-t border-white/10 space-y-6">
-                                                {data.map((item, idx) => (
-                                                    <div key={`${section.key}-detail-${idx}`} className="space-y-2">
-                                                        {item.section && (
-                                                            <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
-                                                                {item.section}
-                                                            </p>
-                                                        )}
-                                                        <div className="text-sm leading-relaxed">
-                                                            {formatParsedContent(item.content).map((element, i) => (
-                                                                <div key={`${section.key}-content-${idx}-${i}`}>
-                                                                    {element}
-                                                                </div>
-                                                            ))}
-                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>

@@ -103,6 +103,7 @@ function JobCardItem({ job, userId }: { job: JobCard; userId: string | null }) {
                     redirect_url: job.redirect_url,
                     fit_score: job.fit_score,
                     user_id: userId,
+                    deadline: job.deadline,
                 }),
             })
             if (res.ok) setSaved(true)
@@ -362,7 +363,7 @@ export default function JobsPage() {
                     const roles = JSON.parse(cached)
                     if (Array.isArray(roles) && roles.length > 0) {
                         setSuggestedQueries(buildSuggestions(roles))
-                        return
+                    
                     }
                 } catch {}
             }

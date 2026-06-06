@@ -165,7 +165,7 @@ class SaveJobRequest(BaseModel):
     redirect_url: str
     fit_score: float
     user_id: str
-
+    deadline: str | None = None
 
 # ── Swagger test endpoints ─────────────────────────────────────────────────────
 
@@ -276,7 +276,7 @@ async def save_job(req: SaveJobRequest):
         "role": req.title,
         "status": "Applied",
         "notes": f"Fit score: {req.fit_score}% — {req.redirect_url}",
-        "applied_date": None,
+        "applied_date": req.deadline[:10] if req.deadline else None,
     }).execute()
 
     return {"status": "saved", "application_id": res.data[0]["id"]}

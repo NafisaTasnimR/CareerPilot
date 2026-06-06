@@ -15,7 +15,7 @@ const TABS = [
   { id: 'progress', label: 'Progress' },
 ]
 
-const USER_ID = 'test-user'
+const USER_ID = 'test-user-123'
 const API = process.env.NEXT_PUBLIC_API_URL
 
 export default function TrackerPage() {

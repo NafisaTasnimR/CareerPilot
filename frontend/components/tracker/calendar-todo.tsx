@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 
-const USER_ID = 'test-user'
+const USER_ID = 'test-user-123'
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']

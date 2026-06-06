@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 
-const USER_ID = 'test-user'
+const USER_ID = 'test-user-123'
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
 export default function ProgressDashboard({ userId, api }: { userId: string; api: string }) {

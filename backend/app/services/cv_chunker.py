@@ -1,5 +1,5 @@
 import re
-from typing import Iterable
+from typing import Any, Iterable
 
 SECTION_HEADERS = {
     "name": {
@@ -216,20 +216,22 @@ def chunk_text(text: str, chunk_size: int = 300) -> list[str]:
     return chunks
 
 
-def chunk_sections_from_sections(sections: dict[str, str | list[str]], chunk_size: int = 300) -> list[dict[str, str]]:
+def chunk_sections_from_sections(sections: dict[str, Any], chunk_size: int = 300) -> list[dict[str, str]]:
     chunks: list[dict[str, str]] = []
 
     for section, content in sections.items():
         if isinstance(content, list):
-            section_text = clean_section([str(item) for item in content])
+            # Each list item becomes its own chunk — preserves individual projects/jobs/degrees
+            for item in content:
+                item_text = str(item or "").strip()
+                if item_text:
+                    chunks.append({"section": normalize_section_name(section), "text": item_text})
         else:
             section_text = str(content or "").strip()
-
-        if not section_text:
-            continue
-
-        for chunk in chunk_text(section_text, chunk_size=chunk_size):
-            chunks.append({"section": normalize_section_name(section), "text": chunk})
+            if not section_text:
+                continue
+            for chunk in chunk_text(section_text, chunk_size=chunk_size):
+                chunks.append({"section": normalize_section_name(section), "text": chunk})
 
     return chunks
 
@@ -304,9 +306,9 @@ def extract_sections_by_lines(text: str) -> list[dict[str, str]]:
 
 
 def _append_chunk(chunks: list[dict[str, str]], section: str, text: str) -> None:
-    chunk_text = text.strip()
-    if chunk_text:
-        chunks.append({"section": section, "text": chunk_text})
+    chunk_text_val = text.strip()
+    if chunk_text_val:
+        chunks.append({"section": section, "text": chunk_text_val})
 
 
 def chunk_sections_improved(text: str) -> list[dict[str, str]]:

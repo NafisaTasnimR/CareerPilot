@@ -78,10 +78,10 @@ def delete_application(app_id: str):
     supabase.table("applications").delete().eq("id", app_id).execute()
     return {"deleted": app_id}
 
+import random
+
 @router.post("/cover-letter")
 def generate_cover_letter(req: CoverLetterRequest):
-    """Generate a personalized cover letter using CV context from Supabase."""
-    # Try to get CV chunks for context
     cv_context = ""
     try:
         chunks = supabase.table("cv_chunks").select("content").eq("user_id", req.user_id).limit(10).execute()
@@ -90,40 +90,33 @@ def generate_cover_letter(req: CoverLetterRequest):
     except:
         pass
 
-    prompt = f"""Write a professional, personalized cover letter for this job application.
+    styles = [
+        "confident and direct, leading with your biggest achievement",
+        "storytelling style, opening with a specific problem you solved",
+        "data-driven, emphasizing measurable results and impact",
+        "enthusiastic and forward-looking, focusing on future contributions",
+        "concise and punchy, every sentence earning its place",
+    ]
+    style = random.choice(styles)
+
+    prompt = f"""Write a professional cover letter for this job. Style: {style}.
 
 Company: {req.company}
 Role: {req.role}
-{f"Job notes: {req.notes}" if req.notes else ""}
+{f"Notes: {req.notes}" if req.notes else ""}
 {f"Candidate background: {cv_context[:1500]}" if cv_context else ""}
 
-Write a compelling 3-paragraph cover letter that:
-1. Opens with genuine enthusiasm for the specific role
-2. Highlights 2-3 relevant skills/experiences
-3. Closes with a clear call to action
-
-Keep it under 300 words. Professional but not robotic. Do not use placeholder text like [Your Name]."""
+Rules:
+- 3 paragraphs, under 280 words
+- Style must be: {style}
+- No placeholder text like [Your Name]
+- Do NOT repeat the previous version — this must be meaningfully different"""
 
     try:
         response = model.generate_content(prompt)
         cover_letter = response.text.strip()
-    except Exception:
-        cover_letter = f"""Dear Hiring Manager,
-
-I am writing to express my strong interest in the {req.role} position at {req.company}. Having reviewed the requirements carefully, I am confident that my skills and experience make me an excellent candidate for this role.
-
-Throughout my career, I have developed strong expertise in areas directly relevant to this position. I am particularly drawn to {req.company}'s work and believe I can contribute meaningfully to your team from day one.
-
-I would welcome the opportunity to discuss how my background aligns with your needs. Thank you for considering my application.
-
-Sincerely,
-[Your Name]"""
-
-    # Save cover letter to the application
-    try:
-        supabase.table("applications").update({"cover_letter": cover_letter}).eq("user_id", req.user_id).eq("company", req.company).eq("role", req.role).execute()
-    except:
-        pass
+    except Exception as e:
+        cover_letter = f"Failed to generate: {str(e)}"
 
     return {"cover_letter": cover_letter}
 

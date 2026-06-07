@@ -25,28 +25,28 @@ const firstDayOfMonth = (m: number, y: number) => {
 
 /* ─── palette ────────────────────────────────────────── */
 const P = {
-  bg:        '#0E0D0B',
-  surface:   '#141310',
-  surface2:  '#1A1916',
-  surface3:  '#22201D',
-  border:    '#2C2A26',
-  borderSub: '#201F1C',
-  text1:     '#EDE8DF',
-  text2:     '#7D796F',
-  text3:     '#4A4740',
-  gold:      '#C4924A',
-  goldDim:   'rgba(196,146,74,0.12)',
-  goldBorder:'rgba(196,146,74,0.22)',
-  goldText:  '#D4A96A',
-  green:     '#3A9E7E',
-  greenDim:  'rgba(58,158,126,0.1)',
-  greenBorder:'rgba(58,158,126,0.2)',
-  greenText: '#5BB89A',
-  todayBg:   '#1C1A15',
-  red:       '#C04040',
-  redDim:    'rgba(192,64,64,0.1)',
-  redBorder: 'rgba(192,64,64,0.25)',
-  redText:   '#E07070',
+  bg:        '#111010',
+  surface:   '#191817',
+  surface2:  '#211F1D',
+  surface3:  '#2A2825',
+  border:    '#403C37',
+  borderSub: '#383430',
+  text1:     '#F5F0E8',   // near-white, bright
+  text2:     '#A09890',   // visible secondary
+  text3:     '#6B6560',   // muted but readable
+  gold:      '#E0A84A',   // bright warm gold
+  goldDim:   'rgba(224,168,74,0.18)',
+  goldBorder:'rgba(224,168,74,0.4)',
+  goldText:  '#FFD060',   // vivid gold text
+  green:     '#3EC99A',   // bright teal-green
+  greenDim:  'rgba(62,201,154,0.15)',
+  greenBorder:'rgba(62,201,154,0.4)',
+  greenText: '#5EEFC0',   // vivid teal text
+  todayBg:   '#252118',
+  red:       '#E05050',
+  redDim:    'rgba(224,80,80,0.12)',
+  redBorder: 'rgba(224,80,80,0.35)',
+  redText:   '#FF8080',
 }
 
 export default function CalendarTodo() {
@@ -185,7 +185,7 @@ export default function CalendarTodo() {
 
         /* date inputs */
         .ctd-date { color-scheme: dark; }
-        .ctd-date::-webkit-calendar-picker-indicator { opacity: 0.3; cursor: pointer; filter: invert(1); }
+        .ctd-date::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; filter: invert(1); }
 
         /* checkbox — circle for goals */
         .ctd-chk-circle {
@@ -195,7 +195,7 @@ export default function CalendarTodo() {
           border-radius: 50%; cursor: pointer; flex-shrink: 0;
           transition: all 0.2s; position: relative; background: transparent;
         }
-        .ctd-chk-circle:checked { background: ${P.gold}; border-color: ${P.gold}; }
+        .ctd-chk-circle:checked { background: ${P.goldText}; border-color: ${P.goldText}; }
         .ctd-chk-circle:checked::after {
           content: ''; position: absolute; left: 4px; top: 2px;
           width: 5px; height: 8px;
@@ -222,7 +222,9 @@ export default function CalendarTodo() {
         }
 
         /* focus glow on underline inputs */
-        .ctd-uline:focus { border-bottom-color: ${P.gold} !important; }
+        .ctd-uline:focus { border-bottom-color: #FFD060 !important; }
+        .ctd-uline::placeholder { color: #6B6560; }
+        input::placeholder { color: #6B6560; }
 
         /* calendar day hover */
         .ctd-day:hover { background: ${P.surface3} !important; }
@@ -240,7 +242,7 @@ export default function CalendarTodo() {
         .ctd-add-btn:hover { background: ${P.text1} !important; color: ${P.bg} !important; }
 
         /* task add btn */
-        .ctd-task-add:hover { border-color: ${P.green} !important; color: ${P.greenText} !important; }
+        .ctd-task-add:hover { border-color: ${P.greenText} !important; color: ${P.greenText} !important; background: rgba(62,201,154,0.08) !important; }
 
         /* delete btn */
         .ctd-del:hover { color: ${P.redText} !important; }
@@ -296,12 +298,12 @@ export default function CalendarTodo() {
         {/* ── HEADER ── */}
         <div className="ctd-in" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 52 }}>
           <div>
-            <p style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.22em', textTransform: 'uppercase', color: P.text3, marginBottom: 10 }}>
+            <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.22em', textTransform: 'uppercase', color: '#9A948C', marginBottom: 10 }}>
               Planner
             </p>
             <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 52, fontWeight: 300, lineHeight: 1, letterSpacing: '-0.01em', color: P.text1 }}>
               {MONTHS[calMonth]}
-              <em style={{ fontStyle: 'italic', color: P.gold }}> {calYear}</em>
+              <em style={{ fontStyle: 'italic', color: '#FFD060' }}> {calYear}</em>
             </h1>
           </div>
 
@@ -334,7 +336,7 @@ export default function CalendarTodo() {
             {/* Day names */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: `1px solid ${P.border}`, marginBottom: 0 }}>
               {DAYS_SHORT.map(d => (
-                <div key={d} style={{ padding: '0 0 12px', textAlign: 'center', fontSize: 10, fontWeight: 500, letterSpacing: '0.14em', textTransform: 'uppercase', color: P.text3 }}>
+                <div key={d} style={{ padding: '0 0 12px', textAlign: 'center', fontSize: 10, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#9A948C' }}>
                   {d}
                 </div>
               ))}
@@ -364,46 +366,72 @@ export default function CalendarTodo() {
                     onMouseEnter={() => hasAny && setHoveredDate(ds)}
                     onMouseLeave={() => setHoveredDate(null)}
                     style={{
-                      minHeight: 96, padding: '10px 10px 8px',
+                      minHeight: 110, padding: '10px 8px 8px',
                       borderRight: borderR, borderBottom: borderB,
-                      background: isToday ? P.todayBg : 'transparent',
+                      background: isToday ? P.todayBg : hasAny && goalDl.length > 0 && taskDl.length > 0
+                        ? 'rgba(139,111,212,0.18)'
+                        : hasAny && goalDl.length > 0
+                        ? 'rgba(224,168,74,0.14)'
+                        : hasAny
+                        ? 'rgba(62,201,154,0.12)'
+                        : 'transparent',
                       position: 'relative', transition: 'background 0.15s',
                     }}
                   >
                     {/* Number */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                       <span style={{
                         fontFamily: "'Cormorant Garamond', serif",
-                        fontSize: 15, fontWeight: isToday ? 500 : 300,
-                        color: isToday ? P.gold : P.text3,
+                        fontSize: 17, fontWeight: 500,
+                        color: isToday ? '#FFD060' : '#E8E3DA',
                         lineHeight: 1,
                       }}>
                         {day}
                       </span>
-                      {isToday && <span style={{ width: 4, height: 4, borderRadius: '50%', background: P.gold, display: 'block' }} />}
+                      {isToday && (
+                        <span style={{ fontSize: 8, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#FFD060', background: 'rgba(224,168,74,0.22)', border: '1px solid rgba(224,168,74,0.5)', padding: '1px 5px' }}>
+                          today
+                        </span>
+                      )}
                     </div>
 
                     {/* Events */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {goalDl.slice(0, 1).map(g => (
-                        <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <div style={{ width: 3, height: 3, borderRadius: '50%', background: P.gold, flexShrink: 0 }} />
-                          <span style={{ fontSize: 10, color: P.goldText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 300, letterSpacing: '0.01em' }}>
+                        <div key={g.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          background: 'rgba(224,168,74,0.28)',
+                          borderLeft: '3px solid #E0A84A',
+                          padding: '4px 6px',
+                        }}>
+                          <span style={{
+                            fontSize: 11, color: '#FFE080',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            fontWeight: 500, lineHeight: 1.3, letterSpacing: '0.01em',
+                          }}>
                             {g.title}
                           </span>
                         </div>
                       ))}
                       {taskDl.slice(0, 1).map(t => (
-                        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <div style={{ width: 3, height: 3, borderRadius: '50%', background: P.green, flexShrink: 0 }} />
-                          <span style={{ fontSize: 10, color: P.greenText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 300 }}>
+                        <div key={t.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          background: 'rgba(62,201,154,0.22)',
+                          borderLeft: '3px solid #3EC99A',
+                          padding: '4px 6px',
+                        }}>
+                          <span style={{
+                            fontSize: 11, color: '#70F5CC',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            fontWeight: 500, lineHeight: 1.3,
+                          }}>
                             {t.title}
                           </span>
                         </div>
                       ))}
-                      {goalDl.length + taskDl.length > 2 && (
-                        <span style={{ fontSize: 9, color: P.text3, letterSpacing: '0.04em', paddingLeft: 7 }}>
-                          +{goalDl.length + taskDl.length - 2} more
+                      {(goalDl.length > 1 || taskDl.length > 1 || goalDl.length + taskDl.length > 2) && (
+                        <span style={{ fontSize: 10, color: P.text2, paddingLeft: 4 }}>
+                          +{Math.max(0, goalDl.length + taskDl.length - 2)} more
                         </span>
                       )}
                     </div>
@@ -417,7 +445,7 @@ export default function CalendarTodo() {
                         boxShadow: '0 20px 60px rgba(0,0,0,0.55)',
                         pointerEvents: 'none',
                       }}>
-                        <p style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.14em', textTransform: 'uppercase', color: P.text3, marginBottom: 10, paddingBottom: 8, borderBottom: `1px solid ${P.borderSub}` }}>
+                        <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#9A948C', marginBottom: 10, paddingBottom: 8, borderBottom: `1px solid ${P.borderSub}` }}>
                           {ds}
                         </p>
                         {goalDl.map(g => (
@@ -444,12 +472,12 @@ export default function CalendarTodo() {
               {[[P.gold, 'Goal deadline'], [P.green, 'Task due date']].map(([color, label]) => (
                 <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 10, height: 1, background: color }} />
-                  <span style={{ fontSize: 11, color: P.text3, letterSpacing: '0.06em' }}>{label}</span>
+                  <span style={{ fontSize: 11, color: '#9A948C', letterSpacing: '0.06em' }}>{label}</span>
                 </div>
               ))}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 8, height: 8, background: P.todayBg, border: `1px solid ${P.border}` }} />
-                <span style={{ fontSize: 11, color: P.text3, letterSpacing: '0.06em' }}>Today</span>
+                <span style={{ fontSize: 11, color: '#9A948C', letterSpacing: '0.06em' }}>Today</span>
               </div>
             </div>
           </div>
@@ -459,7 +487,7 @@ export default function CalendarTodo() {
 
             {/* Add Goal */}
             <div style={{ paddingBottom: 32, marginBottom: 32, borderBottom: `1px solid ${P.border}` }}>
-              <p style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.2em', textTransform: 'uppercase', color: P.text3, marginBottom: 18 }}>
+              <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#9A948C', marginBottom: 18 }}>
                 New Goal
               </p>
               <input
@@ -491,9 +519,9 @@ export default function CalendarTodo() {
             {/* Goals list */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-                <p style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.2em', textTransform: 'uppercase', color: P.text3 }}>Goals</p>
+                <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#9A948C' }}>Goals</p>
                 {!loading && goals.length > 0 && (
-                  <span style={{ fontSize: 11, color: P.text3 }}>
+                  <span style={{ fontSize: 11, color: '#9A948C' }}>
                     {goals.filter(g => g.completed).length} / {goals.length}
                   </span>
                 )}
@@ -526,11 +554,11 @@ export default function CalendarTodo() {
                             style={{ marginTop: 2 }}
                           />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ fontSize: 14, fontWeight: 300, color: goal.completed ? P.text3 : P.text1, textDecoration: goal.completed ? 'line-through' : 'none', lineHeight: 1.45, marginBottom: goal.deadline ? 4 : 0 }}>
+                            <p style={{ fontSize: 14, fontWeight: 500, color: goal.completed ? '#5A5650' : '#F0EBE2', textDecoration: goal.completed ? 'line-through' : 'none', lineHeight: 1.45, marginBottom: goal.deadline ? 4 : 0 }}>
                               {goal.title}
                             </p>
                             {goal.deadline && (
-                              <p style={{ fontSize: 11, color: P.gold, letterSpacing: '0.04em' }}>{goal.deadline}</p>
+                              <p style={{ fontSize: 11, color: '#FFD060', letterSpacing: '0.04em' }}>{goal.deadline}</p>
                             )}
                             {myTasks.length > 0 && (
                               <p style={{ fontSize: 10, color: P.text3, marginTop: 5, letterSpacing: '0.04em' }}>
@@ -570,11 +598,11 @@ export default function CalendarTodo() {
                                   checked={task.completed}
                                   onChange={() => toggleTask(task.id, task.completed)}
                                 />
-                                <span style={{ flex: 1, fontSize: 12, fontWeight: 300, color: task.completed ? P.text3 : P.text1, textDecoration: task.completed ? 'line-through' : 'none', lineHeight: 1.5 }}>
+                                <span style={{ flex: 1, fontSize: 12, fontWeight: 400, color: task.completed ? '#5A5650' : '#E0DBD2', textDecoration: task.completed ? 'line-through' : 'none', lineHeight: 1.5 }}>
                                   {task.title}
                                 </span>
                                 {task.due_date && (
-                                  <span style={{ fontSize: 10, color: P.green, letterSpacing: '0.04em', flexShrink: 0 }}>{task.due_date}</span>
+                                  <span style={{ fontSize: 10, color: '#70F5CC', letterSpacing: '0.04em', flexShrink: 0 }}>{task.due_date}</span>
                                 )}
                                 <button
                                   className="ctd-del"

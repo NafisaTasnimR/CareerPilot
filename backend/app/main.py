@@ -31,6 +31,10 @@ async def preflight_handler(rest_of_path: str, request: Request):
 
 app.include_router(api_router, prefix="/api")
 
+@app.on_event("startup")
+async def startup_event():
+    initialize_firebase()
+    start_scheduler()
 
 @app.get("/")
 def root():

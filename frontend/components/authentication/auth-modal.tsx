@@ -44,7 +44,7 @@ export default function AuthModal({ isOpen, mode, onClose, onToggleMode }: AuthM
             // Sync user to backend (same as original handleGoogleSignUp)
             const idToken = await result.user.getIdToken();
             const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/me`, {
-                method: 'POST',
+                method: 'OPTIONS',
                 credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',

@@ -1,6 +1,4 @@
 import uuid
-
-from gotrue import datetime
 from sqlalchemy import Column, DateTime, String, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime, timezone
@@ -14,4 +12,6 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     full_name = Column(String)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    
+    # Updated default to pass the callable function instead of a fixed timestamp
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

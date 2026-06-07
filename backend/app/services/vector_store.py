@@ -96,6 +96,8 @@ def get_embeddings_by_source(source: str) -> dict:
 
 
 def query_embeddings(query_embedding: list[float], n_results: int = 8, source: str | None = None) -> dict:
+    print(f"Embedding type: {type(query_embedding)}")
+    print(f"First few values: {query_embedding[:3]}")
     params = {
         "query_embedding": query_embedding,
         "match_count": max(1, n_results),

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import AppShell from '@/components/app-shell'
 import { Send, Plus, Copy, Check } from 'lucide-react'
-import { getBackendUrl } from '@/lib/backend'
+import { getBackendUrl, getAuthHeaders } from '@/lib/backend'
 
 type AssistantMessage = {
     role: 'user' | 'assistant'
@@ -304,10 +304,18 @@ export default function AssistantPage() {
         setIsSending(true)
 
         try {
+            const authHeaders = await getAuthHeaders()
             const response = await fetch(`${getBackendUrl()}/api/assistant/`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: trimmedQuery, file_id: fileId }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': authHeaders['Authorization'],
+                },
+                body: JSON.stringify({
+                    query: trimmedQuery,
+                    file_id: fileId,
+                    history: messages.map(m => ({ role: m.role, content: m.content }))
+                }),
             })
 
             if (!response.ok) {

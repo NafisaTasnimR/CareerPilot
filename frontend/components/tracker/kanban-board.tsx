@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getAuthHeaders } from '@/lib/backend'
 
 const USER_ID = 'test-user-123'
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
@@ -13,12 +12,25 @@ const COLUMNS = [
   { id: 'Rejected',     bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.25)',   dot: '#ef4444'  },
 ]
 
-export default function KanbanBoard({ api }: { api: string }) {
-  const [apps, setApps] = useState<any[]>([])
-  const [showForm, setShowForm] = useState(false)
-  const [company, setCompany] = useState('')
-  const [role, setRole] = useState('')
-  const [dragging, setDragging] = useState<string | null>(null)
+interface App {
+  id: string
+  company: string
+  role: string
+  status: string
+  notes?: string
+  applied_date?: string
+  redirect_url?: string
+  fit_score?: number
+  deadline?: string
+  cover_letter?: string
+  source?: string
+}
+
+export default function KanbanBoard({ userId, api }: { userId?: string; api?: string }) {
+  const uid     = USER_ID
+  const baseApi = API
+
+  const [apps, setApps] = useState<App[]>([])
   const [loading, setLoading] = useState(true)
   const [dragging, setDragging] = useState<string | null>(null)
 
@@ -39,77 +51,77 @@ export default function KanbanBoard({ api }: { api: string }) {
   const [clLoading, setClLoading] = useState(false)
 
   useEffect(() => {
-    const loadApplications = async () => {
-      try {
-        const authHeaders = await getAuthHeaders()
-        const res = await fetch(`${api}/kanban/`, { headers: authHeaders })
+    fetch(`${baseApi}/kanban?user_id=${uid}`)
+      .then(r => r.json())
+      .then(data => { setApps(Array.isArray(data) ? data : []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, []) // eslint-disable-line
 
-        // Handle HTTP errors
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}))
-          throw new Error(errorData.detail || `HTTP ${res.status}`)
-        }
-
-        const data = await res.json()
-
-        // Ensure data is an array before setting state
-        if (Array.isArray(data)) {
-          setApps(data)
-        } else {
-          console.error('Expected array from /kanban, got:', data)
-          setApps([])
-        }
-      } catch (error) {
-        console.error('Failed to load applications:', error)
-        setApps([]) // fallback to empty array
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadApplications()
-  }, [api])
   const addApplication = async () => {
-    if (!company.trim() || !role.trim()) return
-    try {
-      const authHeaders = await getAuthHeaders()
-      const res = await fetch(`${api}/kanban/`, {
-        method: 'POST',
-        headers: { ...authHeaders },
-        body: JSON.stringify({ company, role, status: 'Applied' }),
-      })
-      const created = await res.json()
-      setApps(prev => [...prev, created])
-      setCompany(''); setRole(''); setShowForm(false)
-    } catch (error) {
-      console.error('Failed to add application:', error)
-    }
+    if (!fCompany.trim() || !fRole.trim()) return
+    const res = await fetch(`${baseApi}/kanban?user_id=${uid}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company: fCompany, role: fRole,
+        notes: fNotes || null,
+        deadline: fDeadline || null,
+        redirect_url: fUrl || null,
+        status: 'Applied', source: 'manual',
+      }),
+    })
+    const created = await res.json()
+    setApps(prev => [created, ...prev])
+    setFCompany(''); setFRole(''); setFNotes(''); setFDeadline(''); setFUrl('')
+    setShowForm(false)
   }
 
   const moveCard = async (appId: string, newStatus: string) => {
-    try {
-      const authHeaders = await getAuthHeaders()
-      await fetch(`${api}/kanban/${appId}`, {
-        method: 'PATCH',
-        headers: { ...authHeaders },
-        body: JSON.stringify({ status: newStatus }),
-      })
-      setApps(prev => prev.map(a => a.id === appId ? { ...a, status: newStatus } : a))
-    } catch (error) {
-      console.error('Failed to update application:', error)
+    const patch: any = { status: newStatus }
+    if (newStatus === 'Applied' && !apps.find(a => a.id === appId)?.applied_date) {
+      patch.applied_date = new Date().toISOString().split('T')[0]
     }
+    await fetch(`${baseApi}/kanban/${appId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    setApps(prev => prev.map(a => a.id === appId ? { ...a, ...patch } : a))
+    if (detailApp?.id === appId) setDetailApp(prev => prev ? { ...prev, ...patch } : null)
   }
 
   const deleteApp = async (appId: string) => {
-    try {
-      const authHeaders = await getAuthHeaders()
-      await fetch(`${api}/kanban/${appId}`, {
-        method: 'DELETE',
-        headers: { ...authHeaders },
-      })
-      setApps(prev => prev.filter(a => a.id !== appId))
-    } catch (error) {
-      console.error('Failed to delete application:', error)
-    }
+    await fetch(`${baseApi}/kanban/${appId}`, { method: 'DELETE' })
+    setApps(prev => prev.filter(a => a.id !== appId))
+    if (detailApp?.id === appId) setDetailApp(null)
+  }
+
+  const generateCoverLetter = async (app: App, force = false) => {
+  setClApp(app)
+  if (app.cover_letter && !force) {
+    setClText(app.cover_letter)
+    return
+  }
+  setClLoading(true)
+  setClText('')
+  try {
+    const res = await fetch(`${baseApi}/kanban/cover-letter`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: app.company, role: app.role, user_id: uid, notes: app.notes }),
+    })
+    const data = await res.json()
+    setClText(data.cover_letter)
+    setApps(prev => prev.map(a => a.id === app.id ? { ...a, cover_letter: data.cover_letter } : a))
+  } catch { setClText('Failed to generate. Please try again.') }
+  setClLoading(false)
+}
+
+  const openGmailCompose = (app: App, coverLetter: string) => {
+    const subject = encodeURIComponent(`Application for ${app.role}`)
+    const body = encodeURIComponent(coverLetter)
+    const to = app.notes?.includes('@') ? encodeURIComponent(app.notes) : ''
+    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`, '_blank')
   }
 
   if (loading) return <p style={{ color: '#6b7280', padding: 16 }}>Loading applications...</p>

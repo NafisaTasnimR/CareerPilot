@@ -41,7 +41,7 @@ export default function SettingsPage() {
             // Sync user data to backend
             const idToken = await user.getIdToken()
             const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/users/me`, {
-                method: 'POST',
+                method: 'OPTIONS',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${idToken}`,

@@ -20,13 +20,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
-            setLoading(false);
-        });
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        setUser(currentUser)
 
-        return () => unsubscribe();
-    }, []);
+        // Sync user to Supabase on every login
+        if (currentUser) {
+            try {
+                const idToken = await currentUser.getIdToken()
+                await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/me`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        firebase_uid: currentUser.uid,
+                        email: currentUser.email,
+                        full_name: currentUser.displayName || '',
+                    }),
+                })
+            } catch (e) {
+                console.error('User sync failed:', e)
+            }
+        }
+
+        setLoading(false)
+    })
+
+    return () => unsubscribe()
+}, [])
+
 
     useEffect(() => {
         if (!loading) {

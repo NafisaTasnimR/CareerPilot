@@ -1,17 +1,28 @@
+import os
+import random
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from datetime import date
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from typing import Optional
-from datetime import date
-from sqlalchemy.orm import Session
+from google import genai
+
 import firebase_admin
 from firebase_admin import auth as firebase_auth
 
 from app.db import supabase
-from app.models import User as UserModel
 
 router = APIRouter(prefix="/kanban", tags=["kanban"])
 security = HTTPBearer()
+
+_genai_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+VALID_STATUSES = ["Applied", "Interviewing", "Offer", "Rejected"]
+
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -20,7 +31,7 @@ async def get_current_user(
     try:
         decoded_token = firebase_auth.verify_id_token(token, clock_skew_seconds=60)
         uid = decoded_token['uid']
-        
+
         result = supabase.table("users").select("*").eq("firebase_uid", uid).single().execute()
         if not result.data:
             raise HTTPException(status_code=401, detail="User not found")
@@ -30,10 +41,6 @@ async def get_current_user(
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Token verification failed: {str(e)}")
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel("gemini-2.0-flash")
-
-VALID_STATUSES = ["Applied", "Interviewing", "Offer", "Rejected"]
 
 class ApplicationCreate(BaseModel):
     company: str
@@ -46,6 +53,7 @@ class ApplicationCreate(BaseModel):
     deadline: Optional[str] = None
     source: Optional[str] = "manual"
 
+
 class ApplicationUpdate(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
@@ -54,59 +62,62 @@ class ApplicationUpdate(BaseModel):
     applied_date: Optional[str] = None
     cover_letter: Optional[str] = None
 
+
 class CoverLetterRequest(BaseModel):
     company: str
     role: str
     user_id: str
     notes: Optional[str] = None
 
+
 class EmailRequest(BaseModel):
     app_id: str
     user_id: str
     user_name: str
     user_email: str
-    user_password: str  # app password for Gmail
+    user_password: str
     hr_email: str
     cover_letter: str
     company: str
     role: str
 
+
 @router.get("/")
-def get_applications(current_user = Depends(get_current_user)):
-    res = supabase.table("applications").select("*").eq("user_id", current_user.firebase_uid).execute()
+def get_applications(current_user=Depends(get_current_user)):
+    res = supabase.table("applications").select("*").eq("user_id", current_user["firebase_uid"]).execute()
     return res.data
 
+
 @router.post("/")
-def create_application(app: ApplicationCreate, current_user = Depends(get_current_user)):
+def create_application(app: ApplicationCreate, current_user=Depends(get_current_user)):
     if app.status not in VALID_STATUSES:
         raise HTTPException(400, f"Status must be one of {VALID_STATUSES}")
-    res = supabase.table("applications").insert({**app.dict(), "user_id": current_user.firebase_uid}).execute()
+    res = supabase.table("applications").insert({**app.dict(), "user_id": current_user["firebase_uid"]}).execute()
     return res.data[0]
 
+
 @router.patch("/{app_id}")
-def update_application(app_id: str, update: ApplicationUpdate, current_user = Depends(get_current_user)):
-    # Verify that the application belongs to the current user
-    res = supabase.table("applications").select("*").eq("id", app_id).eq("user_id", current_user.firebase_uid).execute()
+def update_application(app_id: str, update: ApplicationUpdate, current_user=Depends(get_current_user)):
+    res = supabase.table("applications").select("*").eq("id", app_id).eq("user_id", current_user["firebase_uid"]).execute()
     if not res.data:
         raise HTTPException(403, "Application not found or unauthorized")
-    
+
     data = {k: v for k, v in update.dict().items() if v is not None}
     if "status" in data and data["status"] not in VALID_STATUSES:
         raise HTTPException(400, "Invalid status")
     res = supabase.table("applications").update(data).eq("id", app_id).execute()
     return res.data[0]
 
+
 @router.delete("/{app_id}")
-def delete_application(app_id: str, current_user = Depends(get_current_user)):
-    # Verify that the application belongs to the current user
-    res = supabase.table("applications").select("*").eq("id", app_id).eq("user_id", current_user.firebase_uid).execute()
+def delete_application(app_id: str, current_user=Depends(get_current_user)):
+    res = supabase.table("applications").select("*").eq("id", app_id).eq("user_id", current_user["firebase_uid"]).execute()
     if not res.data:
         raise HTTPException(403, "Application not found or unauthorized")
-    
+
     supabase.table("applications").delete().eq("id", app_id).execute()
     return {"deleted": app_id}
 
-import random
 
 @router.post("/cover-letter")
 def generate_cover_letter(req: CoverLetterRequest):
@@ -115,7 +126,7 @@ def generate_cover_letter(req: CoverLetterRequest):
         chunks = supabase.table("cv_chunks").select("content").eq("user_id", req.user_id).limit(10).execute()
         if chunks.data:
             cv_context = "\n".join([c["content"] for c in chunks.data])
-    except:
+    except Exception:
         pass
 
     styles = [
@@ -141,12 +152,16 @@ Rules:
 - Do NOT repeat the previous version — this must be meaningfully different"""
 
     try:
-        response = model.generate_content(prompt)
-        cover_letter = response.text.strip()
+        response = _genai_client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+        )
+        cover_letter = (getattr(response, "text", "") or "").strip()
     except Exception as e:
         cover_letter = f"Failed to generate: {str(e)}"
 
     return {"cover_letter": cover_letter}
+
 
 @router.post("/send-email")
 def send_application_email(req: EmailRequest):
@@ -167,13 +182,10 @@ Best regards,
 
         msg.attach(MIMEText(body, "plain"))
 
-        # Send via Gmail SMTP
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(req.user_email, req.user_password)
             server.send_message(msg)
 
-        # Mark as Applied with today's date
-        from datetime import date
         supabase.table("applications").update({
             "status": "Applied",
             "applied_date": str(date.today()),
@@ -183,6 +195,10 @@ Best regards,
         return {"status": "sent", "message": f"Email sent to {req.hr_email}"}
 
     except smtplib.SMTPAuthenticationError:
-        raise HTTPException(400, "Gmail authentication failed. Use an App Password, not your regular password. Enable it at myaccount.google.com/apppasswords")
+        raise HTTPException(
+            400,
+            "Gmail authentication failed. Use an App Password, not your regular password. "
+            "Enable it at myaccount.google.com/apppasswords",
+        )
     except Exception as e:
         raise HTTPException(500, f"Failed to send email: {str(e)}")

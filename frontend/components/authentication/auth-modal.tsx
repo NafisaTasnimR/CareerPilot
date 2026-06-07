@@ -44,18 +44,17 @@ export default function AuthModal({ isOpen, mode, onClose, onToggleMode }: AuthM
             // Sync user to backend (same as original handleGoogleSignUp)
             const idToken = await result.user.getIdToken();
             const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/users/me`, {
-                method: 'OPTIONS',
-                credentials: 'include',
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${idToken}`,
+                    // No Authorization header needed here
                 },
                 body: JSON.stringify({
                     firebase_uid: result.user.uid,
                     email: result.user.email,
                     full_name: result.user.displayName || "",
                 }),
-            });
+            })
 
             if (!response.ok) {
                 const errorData = await response.json();

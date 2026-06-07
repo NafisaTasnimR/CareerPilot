@@ -9,10 +9,8 @@ import {
     AlertCircle,
     Loader2,
     RefreshCcw,
-    ChevronDown,
-    ChevronUp,
 } from 'lucide-react'
-import { getBackendUrl } from '@/lib/backend'
+import { getBackendUrl, getAuthHeaders } from '@/lib/backend'
 
 interface CVParsedItem {
     section: string
@@ -53,7 +51,6 @@ function summarizeContent(text: string, limit: number = SUMMARY_LIMIT) {
     if (!cleaned) return ''
     if (cleaned.length <= limit) return cleaned
 
-    // Try to find a natural sentence end
     const sentenceEnd = cleaned.search(/[.!?]/)
     if (sentenceEnd > 40 && sentenceEnd < limit) {
         return cleaned.slice(0, sentenceEnd + 1)
@@ -63,14 +60,11 @@ function summarizeContent(text: string, limit: number = SUMMARY_LIMIT) {
 }
 
 function formatParsedContent(text: string) {
-    // Split by common delimiters that indicate new entries or bullet points
-    // This helps avoid the "blob of text" look seen in the screenshot
     const lines = text.split(/\n|EXPERIENCE|EDUCATION|SKILLS|PROJECTS/i)
         .map(line => line.trim())
         .filter(Boolean)
 
     return lines.map(line => {
-        // Handle bullet points explicitly
         if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) {
             return (
                 <div key={`bullet-${line}`} className="flex gap-2 mb-1">
@@ -79,8 +73,6 @@ function formatParsedContent(text: string) {
                 </div>
             )
         }
-        // If the line starts with a common label like "title:" or "degree:", 
-        // we can make it look better
         if (line.toLowerCase().startsWith('title:') || line.toLowerCase().startsWith('degree:')) {
             return <p key={`label-${line}`} className="text-white font-medium mb-1">{line}</p>
         }
@@ -161,14 +153,20 @@ export default function DashboardContent({
 
             try {
                 const backendUrl = getBackendUrl()
-                // Use pagination to prevent huge responses
                 const queryParams = new URLSearchParams({
                     file_id: fileId,
                     limit: pagination.limit.toString(),
                     offset: pagination.offset.toString(),
                 })
+                // Get authentication headers (Firebase token)
+                const authHeaders = await getAuthHeaders()
                 const response = await fetch(
-                    `${backendUrl}/api/cv/embedded-data?${queryParams}`
+                    `${backendUrl}/api/cv/embedded-data?${queryParams}`,
+                    {
+                        headers: {
+                            'Authorization': authHeaders['Authorization'],
+                        },
+                    }
                 )
 
                 if (!response.ok) {
@@ -177,9 +175,7 @@ export default function DashboardContent({
                 }
 
                 const data = (await response.json()) as CVEmbeddedDataResponse
-                if (cancelled) {
-                    return
-                }
+                if (cancelled) return
 
                 const nextParsedData = {
                     experience: [] as CVParsedItem[],
@@ -191,7 +187,6 @@ export default function DashboardContent({
                 data.sections.forEach((section) => {
                     const sectionKey = normalizeSectionKey(section.section) as keyof typeof nextParsedData
                     if (sectionKey in nextParsedData) {
-                        // Filter out empty items to ensure count is accurate
                         nextParsedData[sectionKey] = section.items.filter(item => item.content && item.content.trim().length > 0)
                     }
                 })
@@ -208,100 +203,89 @@ export default function DashboardContent({
                     setError(message)
                 }
             } finally {
-                if (!cancelled) {
-                    setLoading(false)
-                }
+                if (!cancelled) setLoading(false)
             }
         }
 
-        if (fileId) {
-            loadResumeData()
-        }
-
-        return () => {
-            cancelled = true
-        }
+        if (fileId) loadResumeData()
+        return () => { cancelled = true }
     }, [fileId, pagination])
 
     const sectionConfig = [
-        {
-            key: 'experience',
-            title: 'Experience',
-            icon: Briefcase,
-        },
-        {
-            key: 'education',
-            title: 'Education',
-            icon: BookOpen,
-        },
-        {
-            key: 'skills',
-            title: 'Skills',
-            icon: Code,
-        },
-        {
-            key: 'projects',
-            title: 'Projects',
-            icon: Zap,
-        },
+        { key: 'experience', title: 'Experience', icon: Briefcase },
+        { key: 'education', title: 'Education', icon: BookOpen },
+        { key: 'skills', title: 'Skills', icon: Code },
+        { key: 'projects', title: 'Projects', icon: Zap },
     ]
 
-    const skillTags = extractSkillTags(parsedData.skills)
+    const splitSkills = (text: string) => {
+        return text
+            .split(/,|\s{2,}| - /)
+            .map(s => s.trim())
+            .filter(Boolean)
+    }
+
+    const skillTags = splitSkills(parsedData.skills.map(s => s.content).join(', '))
 
     const toggleSection = (key: string) => {
-        setExpandedSections((prev) => ({
-            ...prev,
-            [key]: !prev[key],
-        }))
+        setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }))
     }
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center py-20">
-                <div className="text-center space-y-4">
-                    <Loader2 className="w-10 h-10 text-white/70 animate-spin mx-auto" />
-                    <p className="text-white/70">Loading your resume...</p>
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center space-y-3">
+                    <Loader2 className="w-8 h-8 animate-spin text-white/40 mx-auto" />
+                    <p className="text-white/40 text-sm">Loading your resume...</p>
+                </div>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center space-y-4 max-w-sm">
+                    <AlertCircle className="w-8 h-8 text-red-400 mx-auto" />
+                    <p className="text-white/60 text-sm">{error}</p>
+                    {onReupload && (
+                        <button
+                            onClick={onReupload}
+                            className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white border border-white/15 rounded-lg px-4 py-2 transition-colors"
+                        >
+                            <RefreshCcw className="w-4 h-4" />
+                            Re-upload CV
+                        </button>
+                    )}
                 </div>
             </div>
         )
     }
 
     return (
-        <div className="max-w-6xl mx-auto space-y-10">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="space-y-2">
-                    <h1 className="text-3xl sm:text-4xl font-semibold text-white">
-                        Your profile
-                    </h1>
-                    <p className="text-white/70 text-sm">
-                        Resume: <span className="text-white">{fileName}</span>
-                    </p>
-                    <p className="text-xs text-white/50">
-                        {collection ? `Indexed in ${collection}` : 'Live embedded data'}
-                        {` • ${liveChunkCount} chunks indexed`}
+        <div className="space-y-6 max-w-5xl mx-auto">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-white font-semibold text-xl">Your Resume</h1>
+                    <p className="text-white/50 text-sm mt-1">
+                        {fileName} · {liveChunkCount} sections indexed
+                        {collection && <span className="text-white/30"> · {collection}</span>}
                     </p>
                 </div>
-                <button
-                    type="button"
-                    onClick={onReupload}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-white/15 bg-[#171717] text-white text-sm hover:border-white/35 transition-colors"
-                >
-                    <RefreshCcw className="w-4 h-4" />
-                    Re-upload resume
-                </button>
+                {onReupload && (
+                    <button
+                        onClick={onReupload}
+                        className="inline-flex items-center gap-2 text-sm text-white/60 hover:text-white border border-white/15 hover:border-white/30 rounded-lg px-3 py-2 transition-colors shrink-0"
+                    >
+                        <RefreshCcw className="w-3.5 h-3.5" />
+                        Re-upload
+                    </button>
+                )}
             </div>
 
-            {error && (
-                <div className="rounded-xl bg-white/5 border border-white/15 p-4 flex gap-3">
-                    <AlertCircle className="w-5 h-5 text-white/70 flex-shrink-0 mt-0.5" />
-                    <div>
-                        <p className="text-white font-medium">Error loading resume</p>
-                        <p className="text-white/70 text-sm mt-1">{error}</p>
-                    </div>
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Stats row */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="rounded-xl border border-white/15 bg-[#171717] p-5">
                     <div className="flex items-center justify-between">
                         <div>
@@ -340,26 +324,21 @@ export default function DashboardContent({
                 </div>
             </div>
 
+            {/* CV sections grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {sectionConfig.map((section) => {
                     const Icon = section.icon
-                    const data =
-                        parsedData[section.key as keyof typeof parsedData] || []
+                    const data = parsedData[section.key as keyof typeof parsedData] || []
                     const isExpanded = Boolean(expandedSections[section.key])
                     const highlights = getHighlights(data, 3)
                     const isSkills = section.key === 'skills'
 
                     return (
-                        <div
-                            key={section.key}
-                            className="rounded-xl border border-white/15 bg-[#171717] overflow-hidden"
-                        >
+                        <div key={section.key} className="rounded-xl border border-white/15 bg-[#171717] overflow-hidden">
                             <div className="border-b border-white/10 px-5 py-4 flex items-center gap-3 bg-[#141414]">
                                 <Icon className="w-4 h-4 text-white/60" />
                                 <div>
-                                    <h2 className="text-white font-semibold text-sm">
-                                        {section.title}
-                                    </h2>
+                                    <h2 className="text-white font-semibold text-sm">{section.title}</h2>
                                     <p className="text-xs text-white/50">{data.length} entries</p>
                                 </div>
                                 {data.length > 0 && (
@@ -370,14 +349,17 @@ export default function DashboardContent({
                                     >
                                         {isExpanded ? 'Hide details' : 'Show details'}
                                         {isExpanded ? (
-                                            <ChevronUp className="w-3.5 h-3.5" />
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                            </svg>
                                         ) : (
-                                            <ChevronDown className="w-3.5 h-3.5" />
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
                                         )}
                                     </button>
                                 )}
                             </div>
-
                             <div className="p-5">
                                 {data.length > 0 ? (
                                     <div className="space-y-4">
@@ -395,42 +377,25 @@ export default function DashboardContent({
                                                             </span>
                                                         ))
                                                 ) : (
-                                                    <p className="text-white/50 text-sm">
-                                                        No skills found in your resume
-                                                    </p>
+                                                    <p className="text-white/50 text-sm">No skills found in your resume</p>
                                                 )}
                                             </div>
                                         ) : (
                                             <div className="space-y-4">
                                                 {highlights.map((highlight, idx) => (
                                                     <div key={`${section.key}-highlight-${idx}`} className="p-3 rounded-lg bg-white/5 border border-white/5 space-y-1">
-                                                        <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
-                                                            {highlight.label}
-                                                        </p>
-                                                        <p className="text-white/80 text-sm leading-relaxed">
-                                                            {highlight.summary}
-                                                        </p>
+                                                        <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">{highlight.label}</p>
+                                                        <p className="text-white/80 text-sm leading-relaxed">{highlight.summary}</p>
                                                     </div>
                                                 ))}
                                             </div>
                                         )}
-
                                         {isExpanded && (
                                             <div className="pt-4 border-t border-white/10 space-y-6">
                                                 {data.map((item, idx) => (
                                                     <div key={`${section.key}-detail-${idx}`} className="space-y-2">
-                                                        {item.section && (
-                                                            <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
-                                                                {item.section}
-                                                            </p>
-                                                        )}
-                                                        <div className="text-sm leading-relaxed whitespace-pre-line">
-                                                            {formatParsedContent(item.content).map((element, i) => (
-                                                                <div key={`${section.key}-content-${idx}-${i}`}>
-                                                                    {element}
-                                                                </div>
-                                                            ))}
-                                                        </div>
+                                                        {item.section && <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">{item.section}</p>}
+                                                        <div className="text-sm leading-relaxed">{formatParsedContent(item.content)}</div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -448,29 +413,25 @@ export default function DashboardContent({
                 })}
             </div>
 
+            {/* Quick action cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="rounded-xl border border-white/15 bg-[#171717] p-6">
-                    <h3 className="text-white font-semibold text-lg mb-2">
-                        Find jobs
-                    </h3>
+                    <h3 className="text-white font-semibold text-lg mb-2">Find jobs</h3>
                     <p className="text-white/70 text-sm mb-4">
                         Discover job opportunities tailored to your skills and experience.
                     </p>
-                    <button className="text-white font-medium text-sm transition-colors">
-                        Explore jobs
-                    </button>
+                    <a href="/jobs" className="text-white font-medium text-sm transition-colors hover:text-white/70">
+                        Explore jobs →
+                    </a>
                 </div>
-
                 <div className="rounded-xl border border-white/15 bg-[#171717] p-6">
-                    <h3 className="text-white font-semibold text-lg mb-2">
-                        AI assistant
-                    </h3>
+                    <h3 className="text-white font-semibold text-lg mb-2">AI assistant</h3>
                     <p className="text-white/70 text-sm mb-4">
                         Chat with your AI career co-pilot for personalized guidance.
                     </p>
-                    <button className="text-white font-medium text-sm transition-colors">
-                        Start chat
-                    </button>
+                    <a href="/assistant" className="text-white font-medium text-sm transition-colors hover:text-white/70">
+                        Start chat →
+                    </a>
                 </div>
             </div>
         </div>

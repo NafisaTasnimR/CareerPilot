@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { getAuthHeaders } from '@/lib/backend'
 
 const COLUMNS = [
   { id: 'Applied', color: 'bg-blue-500/20 border-blue-500/30' },
@@ -9,7 +10,7 @@ const COLUMNS = [
   { id: 'Rejected', color: 'bg-red-500/20 border-red-500/30' },
 ]
 
-export default function KanbanBoard({ userId, api }: { userId: string; api: string }) {
+export default function KanbanBoard({ api }: { api: string }) {
   const [apps, setApps] = useState<any[]>([])
   const [showForm, setShowForm] = useState(false)
   const [company, setCompany] = useState('')
@@ -18,36 +19,77 @@ export default function KanbanBoard({ userId, api }: { userId: string; api: stri
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`${api}/kanban?user_id=${userId}`)
-      .then(r => r.json())
-      .then(data => { setApps(data); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
+    const loadApplications = async () => {
+      try {
+        const authHeaders = await getAuthHeaders()
+        const res = await fetch(`${api}/kanban/`, { headers: authHeaders })
 
+        // Handle HTTP errors
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}))
+          throw new Error(errorData.detail || `HTTP ${res.status}`)
+        }
+
+        const data = await res.json()
+
+        // Ensure data is an array before setting state
+        if (Array.isArray(data)) {
+          setApps(data)
+        } else {
+          console.error('Expected array from /kanban, got:', data)
+          setApps([])
+        }
+      } catch (error) {
+        console.error('Failed to load applications:', error)
+        setApps([]) // fallback to empty array
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadApplications()
+  }, [api])
   const addApplication = async () => {
     if (!company.trim() || !role.trim()) return
-    const res = await fetch(`${api}/kanban?user_id=${userId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ company, role, status: 'Applied' }),
-    })
-    const created = await res.json()
-    setApps(prev => [...prev, created])
-    setCompany(''); setRole(''); setShowForm(false)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`${api}/kanban/`, {
+        method: 'POST',
+        headers: { ...authHeaders },
+        body: JSON.stringify({ company, role, status: 'Applied' }),
+      })
+      const created = await res.json()
+      setApps(prev => [...prev, created])
+      setCompany(''); setRole(''); setShowForm(false)
+    } catch (error) {
+      console.error('Failed to add application:', error)
+    }
   }
 
   const moveCard = async (appId: string, newStatus: string) => {
-    await fetch(`${api}/kanban/${appId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    })
-    setApps(prev => prev.map(a => a.id === appId ? { ...a, status: newStatus } : a))
+    try {
+      const authHeaders = await getAuthHeaders()
+      await fetch(`${api}/kanban/${appId}`, {
+        method: 'PATCH',
+        headers: { ...authHeaders },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      setApps(prev => prev.map(a => a.id === appId ? { ...a, status: newStatus } : a))
+    } catch (error) {
+      console.error('Failed to update application:', error)
+    }
   }
 
   const deleteApp = async (appId: string) => {
-    await fetch(`${api}/kanban/${appId}`, { method: 'DELETE' })
-    setApps(prev => prev.filter(a => a.id !== appId))
+    try {
+      const authHeaders = await getAuthHeaders()
+      await fetch(`${api}/kanban/${appId}`, {
+        method: 'DELETE',
+        headers: { ...authHeaders },
+      })
+      setApps(prev => prev.filter(a => a.id !== appId))
+    } catch (error) {
+      console.error('Failed to delete application:', error)
+    }
   }
 
   if (loading) return <p className="text-gray-400">Loading applications...</p>

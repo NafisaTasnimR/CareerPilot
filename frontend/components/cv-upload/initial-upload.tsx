@@ -11,7 +11,8 @@ import {
     ShieldCheck,
     Lock,
 } from 'lucide-react'
-import { getBackendUrl } from '@/lib/backend'
+import { getBackendUrl, getAuthHeaders, getAuthToken } from '@/lib/backend'
+import { auth } from '@/lib/firebase'
 
 interface InitialCVUploadProps {
     onUploadSuccess?: (fileId: string, fileName: string, chunkCount: number) => void
@@ -106,9 +107,17 @@ export default function InitialCVUpload({
             const formData = new FormData()
             formData.append('file', file)
             const backendUrl = getBackendUrl()
+            const user = auth.currentUser
+            if (!user) {
+                throw new Error('You must be logged in to upload a CV.')
+            }
+            const idToken = await user.getIdToken(true)
 
             const response = await fetch(`${backendUrl}/api/cv/upload`, {
                 method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${idToken}`,
+                },
                 body: formData,
             })
 
@@ -134,6 +143,9 @@ export default function InitialCVUpload({
                     )}`,
                     {
                         method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${idToken}`,
+                        },
                         body: ingestFormData,
                     }
                 )

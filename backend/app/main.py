@@ -6,6 +6,8 @@ from app.models import User  # Import models to register them with SQLAlchemy
 from app.core.firebase_init import initialize_firebase
 from fastapi import Request
 from fastapi.responses import JSONResponse
+import uvicorn
+import os
 
 app = FastAPI()
 
@@ -39,3 +41,7 @@ async def startup_event():
 @app.get("/")
 def root():
     return {"message": "Backend running"}
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)

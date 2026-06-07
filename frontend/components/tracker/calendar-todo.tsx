@@ -1,10 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { auth } from '@/lib/firebase'
 
 /* ─── constants ──────────────────────────────────────── */
-const USER_ID = 'test-user-123'
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+
+
+
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+    return new Promise((resolve) => {
+        const unsubscribe = auth.onAuthStateChanged(async (user) => {
+            unsubscribe()
+            const token = await user?.getIdToken()
+            resolve({
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            })
+        })
+    })
+}
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAYS_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
@@ -49,9 +64,9 @@ const P = {
   redText:   '#FF8080',
 }
 
-export default function CalendarTodo() {
-  const uid = USER_ID
-  const baseApi = API
+export default function CalendarTodo({ userId = '', api = 'http://localhost:8000' }: { userId?: string; api?: string }) {
+  const uid = userId
+  const baseApi = api
 
   const [goals, setGoals]   = useState<Goal[]>([])
   const [tasks, setTasks]   = useState<Task[]>([])
@@ -71,30 +86,69 @@ export default function CalendarTodo() {
   const [calYear,  setCalYear]  = useState(today.getFullYear())
   const todayStr = toDateStr(today.getFullYear(), today.getMonth(), today.getDate())
 
-  useEffect(() => {
-    setLoading(true); setError(null)
-    Promise.all([
-      fetch(`${baseApi}/calendar/goals?user_id=${uid}`).then(r => { if (!r.ok) throw new Error(`goals ${r.status}`); return r.json() }),
-      fetch(`${baseApi}/calendar/tasks?user_id=${uid}`).then(r => { if (!r.ok) throw new Error(`tasks ${r.status}`); return r.json() }),
-      fetch(`${baseApi}/kanban?user_id=${uid}`).then(r => { if (!r.ok) throw new Error(`kanban ${r.status}`); return r.json() }),
-    ])
-      .then(([goalsData, tasksData, apps]) => {
-        setGoals(Array.isArray(goalsData) ? goalsData : [])
-        const deadlines = Array.isArray(apps) ? apps.filter((a: any) => a.deadline).map((a: any) => ({
-          id: `app-${a.id}`, title: `${a.role} @ ${a.company}`,
-          due_date: a.deadline, completed: a.status === 'Offer' || a.status === 'Rejected', goal_id: null,
-        })) : []
-        setTasks([...(Array.isArray(tasksData) ? tasksData : []), ...deadlines])
-      })
-      .catch(err => { setError(err.message); setGoals([]); setTasks([]) })
-      .finally(() => setLoading(false))
-  }, [])
+useEffect(() => {
+  const load = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const headers = await getAuthHeaders()
+
+      const [goalsData, tasksData] = await Promise.all([
+        fetch(`${baseApi}/calendar/goals`, { headers }).then(r => {
+          if (!r.ok) throw new Error(`goals ${r.status}`)
+          return r.json()
+        }),
+        fetch(`${baseApi}/calendar/tasks`, { headers }).then(r => {
+          if (!r.ok) throw new Error(`tasks ${r.status}`)
+          return r.json()
+        }),
+      ])
+
+      // Fetch kanban apps for deadline display — fail silently if unavailable
+      let apps: any[] = []
+      try {
+        const kanbanRes = await fetch(`${baseApi}/kanban/`, { headers })
+        if (kanbanRes.ok) apps = await kanbanRes.json()
+      } catch {}
+
+      setGoals(Array.isArray(goalsData) ? goalsData : [])
+
+      const deadlines = Array.isArray(apps)
+        ? apps
+            .filter((a: any) => a.deadline)
+            .map((a: any) => ({
+              id: `app-${a.id}`,
+              title: `${a.role} @ ${a.company}`,
+              due_date: a.deadline,
+              completed: a.status === 'Offer' || a.status === 'Rejected',
+              goal_id: null,
+            }))
+        : []
+
+      setTasks([
+        ...(Array.isArray(tasksData) ? tasksData : []),
+        ...deadlines,
+      ])
+    } catch (err: any) {
+      setError(err.message)
+      setGoals([])
+      setTasks([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  load()
+}, [baseApi])
+
 
   const addGoal = async () => {
     if (!newGoal.trim()) return
     try {
-      const res = await fetch(`${baseApi}/calendar/goals?user_id=${uid}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const headers = await getAuthHeaders()
+      const res = await fetch(`${baseApi}/calendar/goals`, {
+        method: 'POST', headers,
         body: JSON.stringify({ title: newGoal, deadline: goalDeadline || null }),
       })
       if (!res.ok) throw new Error()
@@ -107,8 +161,9 @@ export default function CalendarTodo() {
     const text = newTaskTexts[goalId]
     if (!text?.trim()) return
     try {
-      const res = await fetch(`${baseApi}/calendar/tasks?user_id=${uid}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const headers2 = await getAuthHeaders()
+      const res = await fetch(`${baseApi}/calendar/tasks`, {
+        method: 'POST', headers: headers2,
         body: JSON.stringify({ title: text, goal_id: goalId, due_date: newTaskDates[goalId] || null }),
       })
       if (!res.ok) throw new Error()
@@ -120,12 +175,18 @@ export default function CalendarTodo() {
   }
 
   const toggleGoal = async (id: string, completed: boolean) => {
-    try { await fetch(`${baseApi}/calendar/goals/${id}?completed=${!completed}`, { method: 'PATCH' }) } catch {}
-    setGoals(p => p.map(g => g.id === id ? { ...g, completed: !completed } : g))
+    const nowCompleted = !completed
+    try { const h = await getAuthHeaders(); await fetch(`${baseApi}/calendar/goals/${id}?completed=${nowCompleted}`, { method: 'PATCH', headers: h }) } catch {}
+    setGoals(p => p.map(g => g.id === id ? { ...g, completed: nowCompleted } : g))
+    // Cascade: marking a goal done auto-completes all its tasks in the UI too.
+    // Un-marking leaves tasks unchanged (matches backend behaviour).
+    if (nowCompleted) {
+      setTasks(p => p.map(t => t.goal_id === id ? { ...t, completed: true } : t))
+    }
   }
 
   const toggleTask = async (id: string, completed: boolean) => {
-    try { await fetch(`${baseApi}/calendar/tasks/${id}/complete?completed=${!completed}`, { method: 'PATCH' }) } catch {}
+    try { const h = await getAuthHeaders(); await fetch(`${baseApi}/calendar/tasks/${id}/complete?completed=${!completed}`, { method: 'PATCH', headers: h }) } catch {}
     setTasks(p => p.map(t => t.id === id ? { ...t, completed: !completed } : t))
   }
 
@@ -133,11 +194,11 @@ export default function CalendarTodo() {
     if (!confirmDialog) return
     try {
       if (confirmDialog.type === 'goal') {
-        await fetch(`${baseApi}/calendar/goals/${confirmDialog.id}`, { method: 'DELETE' })
+        const dh = await getAuthHeaders(); await fetch(`${baseApi}/calendar/goals/${confirmDialog.id}`, { method: 'DELETE', headers: dh })
         setGoals(p => p.filter(g => g.id !== confirmDialog.id))
         setTasks(p => p.filter(t => t.goal_id !== confirmDialog.id))
       } else {
-        await fetch(`${baseApi}/calendar/tasks/${confirmDialog.id}`, { method: 'DELETE' })
+        const dh2 = await getAuthHeaders(); await fetch(`${baseApi}/calendar/tasks/${confirmDialog.id}`, { method: 'DELETE', headers: dh2 })
         setTasks(p => p.filter(t => t.id !== confirmDialog.id))
       }
     } catch {}

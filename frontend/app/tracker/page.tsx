@@ -55,7 +55,7 @@ export default function TrackerPage() {
         )}
 
         {activeTab === 'calendar' && (
-          <CalendarTodo userId={USER_ID} api={API!} />
+          <CalendarTodo />
         )}
 
         {activeTab === 'progress' && (

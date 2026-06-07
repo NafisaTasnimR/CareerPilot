@@ -5,14 +5,15 @@ import AppShell from '@/components/app-shell'
 import KanbanBoard from '@/components/tracker/kanban-board'
 import CalendarTodo from '@/components/tracker/calendar-todo'
 import ProgressDashboard from '@/components/tracker/progress-dashboard'
-import NudgePanel from '@/components/tracker/nudge-panel'
+
+
+import NudgeWidget from '@/components/tracker/nudge-widget'
 import { getBackendUrl } from '@/lib/backend'
 
 const TABS = [
   { id: 'kanban', label: 'Applications' },
   { id: 'calendar', label: 'Calendar & Goals' },
   { id: 'progress', label: 'Progress' },
-  { id: 'nudges', label: 'AI Nudges' },
 ]
 
 export default function TrackerPage() {
@@ -24,8 +25,12 @@ export default function TrackerPage() {
       <div className="p-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Track Progress</h1>
-          <p className="text-gray-400">Manage your applications, goals, and career progress</p>
+          <h1 className="text-3xl font-bold text-white mb-2">
+            Track Progress
+          </h1>
+          <p className="text-gray-400">
+            Manage your applications, goals, and career progress
+          </p>
         </div>
 
         {/* Tabs */}
@@ -35,8 +40,8 @@ export default function TrackerPage() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-3 text-sm font-medium transition-all border-b-2 -mb-px ${activeTab === tab.id
-                  ? 'border-white text-white'
-                  : 'border-transparent text-gray-400 hover:text-gray-200'
+                ? 'border-white text-white'
+                : 'border-transparent text-gray-400 hover:text-gray-200'
                 }`}
             >
               {tab.label}
@@ -44,12 +49,25 @@ export default function TrackerPage() {
           ))}
         </div>
 
-        {/* Tab content */}
-        {activeTab === 'kanban' && <KanbanBoard api={api} />}
-        {activeTab === 'calendar' && <CalendarTodo api={api} />}
-        {activeTab === 'progress' && <ProgressDashboard api={api} />}
-        {activeTab === 'nudges' && <NudgePanel api={api} />}
+        {/* Main Content */}
+        {activeTab === 'kanban' && (
+          <KanbanBoard userId={USER_ID} api={API!} />
+        )}
+
+        {activeTab === 'calendar' && (
+          <CalendarTodo userId={USER_ID} api={API!} />
+        )}
+
+        {activeTab === 'progress' && (
+          <ProgressDashboard userId={USER_ID} api={API!} />
+        )}
       </div>
+
+      {/* Floating AI Nudge Assistant */}
+      <NudgeWidget
+        userId={USER_ID}
+        api={API!}
+      />
     </AppShell>
   )
 }

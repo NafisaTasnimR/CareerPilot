@@ -2,20 +2,19 @@
 
 import { useState, useEffect } from 'react'
 
-const API = process.env.NEXT_PUBLIC_API_URL
 const USER_ID = 'test-user'
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
-// ── Color palette ──
-const GOLD   = 'rgb(212,170,90)'       // beige-golden
+const GOLD   = 'rgb(212,170,90)'
 const GOLD50 = 'rgba(212,170,90,0.5)'
 const GOLD25 = 'rgba(212,170,90,0.25)'
 const GOLD18 = 'rgba(212,170,90,0.18)'
 const GOLD30 = 'rgba(212,170,90,0.3)'
 const GOLD15 = 'rgba(212,170,90,0.15)'
-const GOLD_TEXT = 'rgb(245,220,150)'   // light warm text
+const GOLD_TEXT = 'rgb(245,220,150)'
 
 const TEAL   = 'rgb(20,184,166)'
 const TEAL50 = 'rgba(20,184,166,0.5)'
@@ -51,9 +50,16 @@ interface ConfirmDialog {
   title: string
 }
 
-export default function CalendarTodo({ userId = USER_ID, api = API! }: { userId?: string; api?: string }) {
+export default function CalendarTodo({ userId, api }: { userId?: string; api?: string }) {
+  // Always use hardcoded values — same pattern as tracker page
+  const uid     = USER_ID
+  const baseApi = API
+
   const [goals, setGoals] = useState<Goal[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [newGoal, setNewGoal] = useState('')
   const [goalDeadline, setGoalDeadline] = useState('')
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null)
@@ -64,49 +70,82 @@ export default function CalendarTodo({ userId = USER_ID, api = API! }: { userId?
 
   const today = new Date()
   const [calMonth, setCalMonth] = useState(today.getMonth())
-  const [calYear, setCalYear] = useState(today.getFullYear())
+  const [calYear, setCalYear]   = useState(today.getFullYear())
 
+  // ── fetch on mount (uid and baseApi are stable constants so this is safe) ──
   useEffect(() => {
-    fetch(`${api}/calendar/goals?user_id=${userId}`)
-      .then(r => r.json()).then(setGoals).catch(console.error)
-    fetch(`${api}/calendar/tasks?user_id=${userId}`)
-      .then(r => r.json()).then(setTasks).catch(console.error)
-  }, [])
+    setLoading(true)
+    setError(null)
+
+    Promise.all([
+      fetch(`${baseApi}/calendar/goals?user_id=${uid}`)
+        .then(r => { if (!r.ok) throw new Error(`goals ${r.status}`); return r.json() }),
+      fetch(`${baseApi}/calendar/tasks?user_id=${uid}`)
+        .then(r => { if (!r.ok) throw new Error(`tasks ${r.status}`); return r.json() }),
+    ])
+      .then(([goalsData, tasksData]) => {
+        setGoals(Array.isArray(goalsData) ? goalsData : [])
+        setTasks(Array.isArray(tasksData) ? tasksData : [])
+      })
+      .catch(err => {
+        console.error('Calendar fetch failed:', err)
+        setError(err.message)
+        setGoals([])
+        setTasks([])
+      })
+      .finally(() => setLoading(false))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // uid and baseApi are module-level constants — safe to omit
 
   const addGoal = async () => {
     if (!newGoal.trim()) return
-    const res = await fetch(`${api}/calendar/goals?user_id=${userId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newGoal, deadline: goalDeadline || null }),
-    })
-    const created = await res.json()
-    setGoals(prev => [...prev, created])
-    setNewGoal(''); setGoalDeadline('')
+    try {
+      const res = await fetch(`${baseApi}/calendar/goals?user_id=${uid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newGoal, deadline: goalDeadline || null }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const created = await res.json()
+      setGoals(prev => [...prev, created])
+      setNewGoal('')
+      setGoalDeadline('')
+    } catch (err) {
+      console.error('Add goal failed:', err)
+    }
   }
 
   const addTask = async (goalId: string) => {
     const text = newTaskTexts[goalId]
     if (!text?.trim()) return
-    const res = await fetch(`${api}/calendar/tasks?user_id=${userId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: text, goal_id: goalId, due_date: newTaskDates[goalId] || null }),
-    })
-    const created = await res.json()
-    setTasks(prev => [...prev, created])
-    setNewTaskTexts(prev => ({ ...prev, [goalId]: '' }))
-    setNewTaskDates(prev => ({ ...prev, [goalId]: '' }))
+    try {
+      const res = await fetch(`${baseApi}/calendar/tasks?user_id=${uid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: text, goal_id: goalId, due_date: newTaskDates[goalId] || null }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const created = await res.json()
+      setTasks(prev => [...prev, created])
+      setNewTaskTexts(prev => ({ ...prev, [goalId]: '' }))
+      setNewTaskDates(prev => ({ ...prev, [goalId]: '' }))
+    } catch (err) {
+      console.error('Add task failed:', err)
+    }
   }
 
   const toggleGoal = async (id: string, completed: boolean) => {
-    await fetch(`${api}/calendar/goals/${id}?completed=${!completed}`, { method: 'PATCH' })
-    setGoals(prev => prev.map(g => g.id === id ? { ...g, completed: !completed } : g))
+    try {
+      await fetch(`${baseApi}/calendar/goals/${id}?completed=${!completed}`, { method: 'PATCH' })
+      setGoals(prev => prev.map(g => g.id === id ? { ...g, completed: !completed } : g))
+    } catch (err) { console.error('Toggle goal failed:', err) }
   }
 
   const toggleTask = async (id: string, completed: boolean) => {
-    await fetch(`${api}/calendar/tasks/${id}/complete?completed=${!completed}`, { method: 'PATCH' })
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !completed } : t))
+    try {
+      await fetch(`${baseApi}/calendar/tasks/${id}/complete?completed=${!completed}`, { method: 'PATCH' })
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !completed } : t))
+    } catch (err) { console.error('Toggle task failed:', err) }
   }
 
   const confirmDelete = (type: 'goal' | 'task', id: string, title: string) => {
@@ -115,21 +154,23 @@ export default function CalendarTodo({ userId = USER_ID, api = API! }: { userId?
 
   const handleConfirmDelete = async () => {
     if (!confirmDialog) return
-    if (confirmDialog.type === 'goal') {
-      await fetch(`${api}/calendar/goals/${confirmDialog.id}`, { method: 'DELETE' })
-      setGoals(prev => prev.filter(g => g.id !== confirmDialog.id))
-      setTasks(prev => prev.filter(t => t.goal_id !== confirmDialog.id))
-    } else {
-      await fetch(`${api}/calendar/tasks/${confirmDialog.id}`, { method: 'DELETE' })
-      setTasks(prev => prev.filter(t => t.id !== confirmDialog.id))
-    }
+    try {
+      if (confirmDialog.type === 'goal') {
+        await fetch(`${baseApi}/calendar/goals/${confirmDialog.id}`, { method: 'DELETE' })
+        setGoals(prev => prev.filter(g => g.id !== confirmDialog.id))
+        setTasks(prev => prev.filter(t => t.goal_id !== confirmDialog.id))
+      } else {
+        await fetch(`${baseApi}/calendar/tasks/${confirmDialog.id}`, { method: 'DELETE' })
+        setTasks(prev => prev.filter(t => t.id !== confirmDialog.id))
+      }
+    } catch (err) { console.error('Delete failed:', err) }
     setConfirmDialog(null)
   }
 
-  const getDaysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate()
-  const getFirstDayOfMonth = (month: number, year: number) => new Date(year, month, 1).getDay()
-  const getDateString = (year: number, month: number, day: number) =>
-    `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  const getDaysInMonth    = (m: number, y: number) => new Date(y, m + 1, 0).getDate()
+  const getFirstDayOfMonth = (m: number, y: number) => new Date(y, m, 1).getDay()
+  const getDateString     = (y: number, m: number, d: number) =>
+    `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 
   const getDeadlinesForDate = (dateStr: string) => ({
     goalDeadlines: goals.filter(g => g.deadline === dateStr),
@@ -137,8 +178,8 @@ export default function CalendarTodo({ userId = USER_ID, api = API! }: { userId?
   })
 
   const daysInMonth = getDaysInMonth(calMonth, calYear)
-  const firstDay = getFirstDayOfMonth(calMonth, calYear)
-  const todayStr = getDateString(today.getFullYear(), today.getMonth(), today.getDate())
+  const firstDay    = getFirstDayOfMonth(calMonth, calYear)
+  const todayStr    = getDateString(today.getFullYear(), today.getMonth(), today.getDate())
 
   const prevMonth = () => {
     if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1) }
@@ -152,6 +193,15 @@ export default function CalendarTodo({ userId = USER_ID, api = API! }: { userId?
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
+      {/* ── ERROR BANNER ── */}
+      {error && (
+        <div style={{ background: '#1f1215', border: '1px solid #3f1820', borderRadius: 8, padding: '10px 16px' }}>
+          <p style={{ color: '#f87171', fontSize: 13, margin: 0 }}>
+            ⚠️ Could not reach backend ({error}). Check that FastAPI is running on {baseApi}.
+          </p>
+        </div>
+      )}
+
       {/* ── DELETE CONFIRMATION MODAL ── */}
       {confirmDialog && (
         <div style={{
@@ -164,25 +214,20 @@ export default function CalendarTodo({ userId = USER_ID, api = API! }: { userId?
             background: '#1a1a1a', border: '1px solid #333', borderRadius: 16,
             padding: 28, width: 360, boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
           }}>
-            {/* Icon */}
             <div style={{
               width: 48, height: 48, borderRadius: '50%',
               background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              marginBottom: 16,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
             }}>
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <path d="M9 11V7M9 13.5V14M3.5 17h11a1.5 1.5 0 001.3-2.25L10.3 3.75a1.5 1.5 0 00-2.6 0L2.2 14.75A1.5 1.5 0 003.5 17z"
                   stroke="rgb(239,68,68)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
-
             <p style={{ fontSize: 16, fontWeight: 700, color: 'white', margin: '0 0 8px 0' }}>
               Delete {confirmDialog.type === 'goal' ? 'Goal' : 'Task'}?
             </p>
-            <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 6px 0' }}>
-              Are you sure you want to delete:
-            </p>
+            <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 6px 0' }}>Are you sure you want to delete:</p>
             <p style={{
               fontSize: 13, fontWeight: 600,
               color: confirmDialog.type === 'goal' ? GOLD_TEXT : TEAL_TEXT,
@@ -200,33 +245,19 @@ export default function CalendarTodo({ userId = USER_ID, api = API! }: { userId?
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 onClick={() => setConfirmDialog(null)}
-                style={{
-                  flex: 1, padding: '10px 0', borderRadius: 10,
-                  background: '#2a2a2a', border: '1px solid #3a3a3a',
-                  color: '#9ca3af', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
+                style={{ flex: 1, padding: '10px 0', borderRadius: 10, background: '#2a2a2a', border: '1px solid #3a3a3a', color: '#9ca3af', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >Cancel</button>
               <button
                 onClick={handleConfirmDelete}
-                style={{
-                  flex: 1, padding: '10px 0', borderRadius: 10,
-                  background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)',
-                  color: 'rgb(252,165,165)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                }}
-              >
-                Delete
-              </button>
+                style={{ flex: 1, padding: '10px 0', borderRadius: 10, background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: 'rgb(252,165,165)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >Delete</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── FULL WIDTH CALENDAR ── */}
+      {/* ── CALENDAR ── */}
       <div style={{ background: '#1c1c1c', border: '1px solid #2a2a2a', borderRadius: 16, overflow: 'hidden' }}>
-
-        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid #2a2a2a' }}>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={prevMonth} style={{ width: 36, height: 36, borderRadius: 10, background: '#2a2a2a', border: 'none', color: 'white', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
@@ -234,18 +265,12 @@ export default function CalendarTodo({ userId = USER_ID, api = API! }: { userId?
           </div>
           <h2 style={{ color: 'white', fontSize: 18, fontWeight: 700, margin: 0 }}>{MONTHS[calMonth]} {calYear}</h2>
           <div style={{ display: 'flex', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 14, height: 14, borderRadius: 4, background: GOLD50, border: `1px solid ${GOLD}` }} />
-              <span style={{ color: '#9ca3af', fontSize: 12 }}>Goal deadline</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 14, height: 14, borderRadius: 4, background: TEAL50, border: `1px solid ${TEAL}` }} />
-              <span style={{ color: '#9ca3af', fontSize: 12 }}>Task due</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 14, height: 14, borderRadius: 4, background: PURPLE50, border: `1px solid ${PURPLE}` }} />
-              <span style={{ color: '#9ca3af', fontSize: 12 }}>Both</span>
-            </div>
+            {[['Goal deadline', GOLD50, GOLD], ['Task due', TEAL50, TEAL], ['Both', PURPLE50, PURPLE]].map(([label, bg, border]) => (
+              <div key={label as string} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 14, height: 14, borderRadius: 4, background: bg as string, border: `1px solid ${border as string}` }} />
+                <span style={{ color: '#9ca3af', fontSize: 12 }}>{label}</span>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -262,81 +287,83 @@ export default function CalendarTodo({ userId = USER_ID, api = API! }: { userId?
             <div key={`e-${i}`} style={{ height: 90, borderRight: '1px solid #1f1f1f', borderBottom: '1px solid #1f1f1f' }} />
           ))}
 
-          {Array.from({ length: daysInMonth }).map((_, i) => {
-            const day = i + 1
-            const dateStr = getDateString(calYear, calMonth, day)
-            const { goalDeadlines, taskDeadlines } = getDeadlinesForDate(dateStr)
-            const isToday = dateStr === todayStr
-            const hasGoal = goalDeadlines.length > 0
-            const hasTask = taskDeadlines.length > 0
-            const isHovered = hoveredDate === dateStr
-            const col = (firstDay + i) % 7
-
-            const cellBg = hasGoal && hasTask ? PURPLE18 : hasGoal ? GOLD18 : hasTask ? TEAL18 : 'transparent'
-            const cellBorder = hasGoal && hasTask ? `1px solid ${PURPLE30}` : hasGoal ? `1px solid ${GOLD30}` : hasTask ? `1px solid ${TEAL30}` : '1px solid #1f1f1f'
-
-            return (
-              <div
-                key={day}
-                onMouseEnter={() => (hasGoal || hasTask) && setHoveredDate(dateStr)}
-                onMouseLeave={() => setHoveredDate(null)}
-                style={{
-                  height: 90, padding: 8,
-                  borderRight: col === 6 ? 'none' : '1px solid #1f1f1f',
-                  borderBottom: '1px solid #1f1f1f',
-                  background: cellBg,
-                  outline: (hasGoal || hasTask) ? cellBorder : undefined,
-                  position: 'relative', cursor: 'default', transition: 'background 0.15s',
-                }}
-              >
-                <div style={{
-                  width: 30, height: 30, borderRadius: '50%',
-                  background: isToday ? 'white' : 'transparent',
-                  color: isToday ? 'black' : '#9ca3af',
-                  fontSize: 13, fontWeight: 600,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {day}
+          {loading
+            ? Array.from({ length: daysInMonth }).map((_, i) => (
+                <div key={i} style={{ height: 90, borderRight: (firstDay + i) % 7 === 6 ? 'none' : '1px solid #1f1f1f', borderBottom: '1px solid #1f1f1f', padding: 8 }}>
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280', fontSize: 13 }}>{i + 1}</div>
                 </div>
+              ))
+            : Array.from({ length: daysInMonth }).map((_, i) => {
+                const day     = i + 1
+                const dateStr = getDateString(calYear, calMonth, day)
+                const { goalDeadlines, taskDeadlines } = getDeadlinesForDate(dateStr)
+                const isToday = dateStr === todayStr
+                const hasGoal = goalDeadlines.length > 0
+                const hasTask = taskDeadlines.length > 0
+                const col     = (firstDay + i) % 7
 
-                <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {goalDeadlines.slice(0, 1).map(g => (
-                    <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 4, background: GOLD25, border: `1px solid ${GOLD50}`, borderRadius: 4, padding: '2px 6px' }}>
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: GOLD, flexShrink: 0 }} />
-                      <span style={{ fontSize: 11, color: GOLD_TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.title}</span>
-                    </div>
-                  ))}
-                  {taskDeadlines.slice(0, 1).map(t => (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 4, background: TEAL25, border: `1px solid ${TEAL50}`, borderRadius: 4, padding: '2px 6px' }}>
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: TEAL, flexShrink: 0 }} />
-                      <span style={{ fontSize: 11, color: TEAL_TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
-                    </div>
-                  ))}
-                  {(goalDeadlines.length + taskDeadlines.length) > 2 && (
-                    <span style={{ fontSize: 10, color: '#6b7280', paddingLeft: 4 }}>+{goalDeadlines.length + taskDeadlines.length - 2} more</span>
-                  )}
-                </div>
+                const cellBg = hasGoal && hasTask ? PURPLE18 : hasGoal ? GOLD18 : hasTask ? TEAL18 : 'transparent'
 
-                {isHovered && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 50, background: '#0f0f0f', border: '1px solid #333', borderRadius: 12, padding: 12, width: 220, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', marginTop: 4 }}>
-                    <p style={{ fontSize: 11, fontWeight: 700, color: '#d1d5db', paddingBottom: 8, borderBottom: '1px solid #222', margin: '0 0 8px 0' }}>{dateStr}</p>
-                    {goalDeadlines.map(g => (
-                      <div key={g.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 0' }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: GOLD, marginTop: 3, flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, color: g.completed ? '#4b5563' : 'white', textDecoration: g.completed ? 'line-through' : 'none' }}>{g.title}</span>
+                return (
+                  <div
+                    key={day}
+                    onMouseEnter={() => (hasGoal || hasTask) && setHoveredDate(dateStr)}
+                    onMouseLeave={() => setHoveredDate(null)}
+                    style={{
+                      height: 90, padding: 8,
+                      borderRight: col === 6 ? 'none' : '1px solid #1f1f1f',
+                      borderBottom: '1px solid #1f1f1f',
+                      background: cellBg,
+                      position: 'relative', cursor: 'default', transition: 'background 0.15s',
+                    }}
+                  >
+                    <div style={{
+                      width: 30, height: 30, borderRadius: '50%',
+                      background: isToday ? 'white' : 'transparent',
+                      color: isToday ? 'black' : '#9ca3af',
+                      fontSize: 13, fontWeight: 600,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>{day}</div>
+
+                    <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {goalDeadlines.slice(0, 1).map(g => (
+                        <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 4, background: GOLD25, border: `1px solid ${GOLD50}`, borderRadius: 4, padding: '2px 6px' }}>
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: GOLD, flexShrink: 0 }} />
+                          <span style={{ fontSize: 11, color: GOLD_TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.title}</span>
+                        </div>
+                      ))}
+                      {taskDeadlines.slice(0, 1).map(t => (
+                        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 4, background: TEAL25, border: `1px solid ${TEAL50}`, borderRadius: 4, padding: '2px 6px' }}>
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: TEAL, flexShrink: 0 }} />
+                          <span style={{ fontSize: 11, color: TEAL_TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                        </div>
+                      ))}
+                      {(goalDeadlines.length + taskDeadlines.length) > 2 && (
+                        <span style={{ fontSize: 10, color: '#6b7280', paddingLeft: 4 }}>+{goalDeadlines.length + taskDeadlines.length - 2} more</span>
+                      )}
+                    </div>
+
+                    {hoveredDate === dateStr && (
+                      <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 50, background: '#0f0f0f', border: '1px solid #333', borderRadius: 12, padding: 12, width: 220, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', marginTop: 4 }}>
+                        <p style={{ fontSize: 11, fontWeight: 700, color: '#d1d5db', paddingBottom: 8, borderBottom: '1px solid #222', margin: '0 0 8px 0' }}>{dateStr}</p>
+                        {goalDeadlines.map(g => (
+                          <div key={g.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 0' }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: GOLD, marginTop: 3, flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, color: g.completed ? '#4b5563' : 'white', textDecoration: g.completed ? 'line-through' : 'none' }}>{g.title}</span>
+                          </div>
+                        ))}
+                        {taskDeadlines.map(t => (
+                          <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 0' }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: TEAL, marginTop: 3, flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, color: t.completed ? '#4b5563' : 'white', textDecoration: t.completed ? 'line-through' : 'none' }}>{t.title}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                    {taskDeadlines.map(t => (
-                      <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 0' }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: TEAL, marginTop: 3, flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, color: t.completed ? '#4b5563' : 'white', textDecoration: t.completed ? 'line-through' : 'none' }}>{t.title}</span>
-                      </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-            )
-          })}
+                )
+              })
+          }
         </div>
       </div>
 
@@ -364,9 +391,7 @@ export default function CalendarTodo({ userId = USER_ID, api = API! }: { userId?
               <button
                 onClick={addGoal}
                 style={{ padding: '10px 20px', background: GOLD, color: '#111', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-              >
-                Add Goal
-              </button>
+              >Add Goal</button>
             </div>
           </div>
         </div>
@@ -374,162 +399,117 @@ export default function CalendarTodo({ userId = USER_ID, api = API! }: { userId?
         {/* Goals List */}
         <div style={{ background: '#1c1c1c', border: '1px solid #2a2a2a', borderRadius: 16, padding: 20, maxHeight: 300, overflowY: 'auto' }}>
           <p style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 16px 0' }}>Your Goals</p>
-          {goals.length === 0 && (
+
+          {loading ? (
+            <p style={{ color: '#4b5563', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>Loading goals...</p>
+          ) : goals.length === 0 ? (
             <p style={{ color: '#4b5563', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>No goals yet</p>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {goals.map(goal => (
-              <div key={goal.id} style={{ background: GOLD15, border: `1px solid ${GOLD30}`, borderRadius: 12, overflow: 'hidden' }}>
-
-                {/* Goal row */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px' }}>
-                  <button
-                    onClick={() => toggleGoal(goal.id, goal.completed)}
-                    title={goal.completed ? 'Mark incomplete' : 'Mark complete'}
-                    style={{
-                      width: 22, height: 22, borderRadius: '50%',
-                      border: `2px solid ${GOLD}`,
-                      background: goal.completed ? GOLD : 'rgba(212,170,90,0.12)',
-                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {goal.completed
-                      ? <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
-                          <path d="M1 3.5L3.2 5.5L8 1" stroke="#111" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      : <div style={{ width: 7, height: 7, borderRadius: '50%', background: GOLD, opacity: 0.5 }} />
-                    }
-                  </button>
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 500, color: goal.completed ? '#6b7280' : GOLD_TEXT, textDecoration: goal.completed ? 'line-through' : 'none', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {goal.title}
-                    </p>
-                    {goal.deadline && (
-                      <p style={{ fontSize: 11, color: GOLD, margin: '2px 0 0 0' }}>⏰ {goal.deadline}</p>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
-                    <span style={{ fontSize: 11, color: '#6b7280', background: '#111', borderRadius: 6, padding: '2px 6px' }}>
-                      {tasks.filter(t => t.goal_id === goal.id).length} tasks
-                    </span>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {goals.map(goal => (
+                <div key={goal.id} style={{ background: GOLD15, border: `1px solid ${GOLD30}`, borderRadius: 12, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px' }}>
                     <button
-                      onClick={() => setExpandedGoal(expandedGoal === goal.id ? null : goal.id)}
-                      style={{ width: 26, height: 26, borderRadius: 6, background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      {expandedGoal === goal.id ? '▲' : '▼'}
-                    </button>
-                    {/* DELETE GOAL BUTTON */}
-                    <button
-                      onClick={() => confirmDelete('goal', goal.id, goal.title)}
-                      title="Delete goal"
+                      onClick={() => toggleGoal(goal.id, goal.completed)}
                       style={{
-                        width: 26, height: 26, borderRadius: 6,
-                        background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
-                        color: 'rgb(252,165,165)', cursor: 'pointer', fontSize: 12,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={e => {
-                        (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.25)'
-                        ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(239,68,68,0.5)'
-                      }}
-                      onMouseLeave={e => {
-                        (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.12)'
-                        ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(239,68,68,0.25)'
+                        width: 22, height: 22, borderRadius: '50%',
+                        border: `2px solid ${GOLD}`,
+                        background: goal.completed ? GOLD : 'rgba(212,170,90,0.12)',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                       }}
                     >
-                      🗑
+                      {goal.completed
+                        ? <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.2 5.5L8 1" stroke="#111" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        : <div style={{ width: 7, height: 7, borderRadius: '50%', background: GOLD, opacity: 0.5 }} />
+                      }
                     </button>
-                  </div>
-                </div>
 
-                {/* Tasks expanded */}
-                {expandedGoal === goal.id && (
-                  <div style={{ borderTop: `1px solid ${GOLD15}`, padding: '10px 12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-                      {tasks.filter(t => t.goal_id === goal.id).length === 0 && (
-                        <p style={{ fontSize: 11, color: '#4b5563', fontStyle: 'italic', margin: 0 }}>No tasks yet</p>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: goal.completed ? '#6b7280' : GOLD_TEXT, textDecoration: goal.completed ? 'line-through' : 'none', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {goal.title}
+                      </p>
+                      {goal.deadline && (
+                        <p style={{ fontSize: 11, color: GOLD, margin: '2px 0 0 0' }}>⏰ {goal.deadline}</p>
                       )}
-                      {tasks.filter(t => t.goal_id === goal.id).map(task => (
-                        <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: TEAL15, border: `1px solid rgba(20,184,166,0.2)`, borderRadius: 8, padding: '6px 10px' }}>
-                          <button
-                            onClick={() => toggleTask(task.id, task.completed)}
-                            title={task.completed ? 'Mark incomplete' : 'Mark complete'}
-                            style={{
-                              width: 18, height: 18, borderRadius: 4,
-                              border: `2px solid ${TEAL}`,
-                              background: task.completed ? TEAL : 'rgba(20,184,166,0.12)',
-                              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                              transition: 'all 0.15s',
-                            }}
-                          >
-                            {task.completed
-                              ? <svg width="7" height="5" viewBox="0 0 7 5" fill="none">
-                                  <path d="M1 2.5L2.8 4L6 1" stroke="#111" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                              : <div style={{ width: 6, height: 6, borderRadius: 2, background: TEAL, opacity: 0.5 }} />
-                            }
-                          </button>
-                          <span style={{ flex: 1, fontSize: 12, color: task.completed ? '#4b5563' : TEAL_TEXT, textDecoration: task.completed ? 'line-through' : 'none' }}>
-                            {task.title}
-                          </span>
-                          {task.due_date && (
-                            <span style={{ fontSize: 11, color: TEAL }}>📌 {task.due_date}</span>
-                          )}
-                          {/* DELETE TASK BUTTON */}
-                          <button
-                            onClick={() => confirmDelete('task', task.id, task.title)}
-                            title="Delete task"
-                            style={{
-                              width: 22, height: 22, borderRadius: 4,
-                              background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
-                              color: 'rgb(252,165,165)', cursor: 'pointer', fontSize: 11,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              flexShrink: 0, transition: 'all 0.15s',
-                            }}
-                            onMouseEnter={e => {
-                              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.25)'
-                              ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(239,68,68,0.5)'
-                            }}
-                            onMouseLeave={e => {
-                              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.12)'
-                              ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(239,68,68,0.25)'
-                            }}
-                          >
-                            🗑
-                          </button>
-                        </div>
-                      ))}
                     </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <input
-                        value={newTaskTexts[goal.id] || ''}
-                        onChange={e => setNewTaskTexts(prev => ({ ...prev, [goal.id]: e.target.value }))}
-                        onKeyDown={e => e.key === 'Enter' && addTask(goal.id)}
-                        placeholder="New task..."
-                        style={{ flex: 1, background: '#111', color: 'white', border: '1px solid #2a2a2a', borderRadius: 8, padding: '6px 10px', fontSize: 12, outline: 'none' }}
-                      />
-                      <input
-                        type="date"
-                        value={newTaskDates[goal.id] || ''}
-                        onChange={e => setNewTaskDates(prev => ({ ...prev, [goal.id]: e.target.value }))}
-                        style={{ background: '#111', color: 'white', border: '1px solid #2a2a2a', borderRadius: 8, padding: '6px 8px', fontSize: 12, outline: 'none', colorScheme: 'dark' }}
-                      />
+
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+                      <span style={{ fontSize: 11, color: '#6b7280', background: '#111', borderRadius: 6, padding: '2px 6px' }}>
+                        {tasks.filter(t => t.goal_id === goal.id).length} tasks
+                      </span>
                       <button
-                        onClick={() => addTask(goal.id)}
-                        style={{ padding: '6px 12px', background: TEAL15, color: TEAL_TEXT, border: `1px solid ${TEAL30}`, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                        onClick={() => setExpandedGoal(expandedGoal === goal.id ? null : goal.id)}
+                        style={{ width: 26, height: 26, borderRadius: 6, background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       >
-                        + Add
+                        {expandedGoal === goal.id ? '▲' : '▼'}
                       </button>
+                      <button
+                        onClick={() => confirmDelete('goal', goal.id, goal.title)}
+                        style={{ width: 26, height: 26, borderRadius: 6, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', color: 'rgb(252,165,165)', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >🗑</button>
                     </div>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
+
+                  {expandedGoal === goal.id && (
+                    <div style={{ borderTop: `1px solid ${GOLD15}`, padding: '10px 12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                        {tasks.filter(t => t.goal_id === goal.id).length === 0 && (
+                          <p style={{ fontSize: 11, color: '#4b5563', fontStyle: 'italic', margin: 0 }}>No tasks yet</p>
+                        )}
+                        {tasks.filter(t => t.goal_id === goal.id).map(task => (
+                          <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: TEAL15, border: `1px solid rgba(20,184,166,0.2)`, borderRadius: 8, padding: '6px 10px' }}>
+                            <button
+                              onClick={() => toggleTask(task.id, task.completed)}
+                              style={{
+                                width: 18, height: 18, borderRadius: 4,
+                                border: `2px solid ${TEAL}`,
+                                background: task.completed ? TEAL : 'rgba(20,184,166,0.12)',
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                              }}
+                            >
+                              {task.completed
+                                ? <svg width="7" height="5" viewBox="0 0 7 5" fill="none"><path d="M1 2.5L2.8 4L6 1" stroke="#111" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                : <div style={{ width: 6, height: 6, borderRadius: 2, background: TEAL, opacity: 0.5 }} />
+                              }
+                            </button>
+                            <span style={{ flex: 1, fontSize: 12, color: task.completed ? '#4b5563' : TEAL_TEXT, textDecoration: task.completed ? 'line-through' : 'none' }}>
+                              {task.title}
+                            </span>
+                            {task.due_date && (
+                              <span style={{ fontSize: 11, color: TEAL }}>📌 {task.due_date}</span>
+                            )}
+                            <button
+                              onClick={() => confirmDelete('task', task.id, task.title)}
+                              style={{ width: 22, height: 22, borderRadius: 4, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', color: 'rgb(252,165,165)', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                            >🗑</button>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input
+                          value={newTaskTexts[goal.id] || ''}
+                          onChange={e => setNewTaskTexts(prev => ({ ...prev, [goal.id]: e.target.value }))}
+                          onKeyDown={e => e.key === 'Enter' && addTask(goal.id)}
+                          placeholder="New task..."
+                          style={{ flex: 1, background: '#111', color: 'white', border: '1px solid #2a2a2a', borderRadius: 8, padding: '6px 10px', fontSize: 12, outline: 'none' }}
+                        />
+                        <input
+                          type="date"
+                          value={newTaskDates[goal.id] || ''}
+                          onChange={e => setNewTaskDates(prev => ({ ...prev, [goal.id]: e.target.value }))}
+                          style={{ background: '#111', color: 'white', border: '1px solid #2a2a2a', borderRadius: 8, padding: '6px 8px', fontSize: 12, outline: 'none', colorScheme: 'dark' }}
+                        />
+                        <button
+                          onClick={() => addTask(goal.id)}
+                          style={{ padding: '6px 12px', background: TEAL15, color: TEAL_TEXT, border: `1px solid ${TEAL30}`, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                        >+ Add</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

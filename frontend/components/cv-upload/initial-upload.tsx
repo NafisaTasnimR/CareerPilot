@@ -9,7 +9,6 @@ import {
     Check,
     FileText,
     ShieldCheck,
-    Lock,
 } from 'lucide-react'
 import { getBackendUrl, getAuthHeaders, getAuthToken } from '@/lib/backend'
 import { auth } from '@/lib/firebase'
@@ -77,7 +76,7 @@ export default function InitialCVUpload({
             'application/pdf',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         ]
-        const maxSize = 10 * 1024 * 1024 // 10MB
+        const maxSize = 10 * 1024 * 1024
 
         if (!validTypes.includes(file.type)) {
             return 'Please upload a PDF or DOCX file'
@@ -133,14 +132,11 @@ export default function InitialCVUpload({
 
             setStage('parsing')
 
-            // Then, ingest the file
             try {
                 const ingestFormData = new FormData()
                 ingestFormData.append('file', file)
                 const ingestResponse = await fetch(
-                    `${backendUrl}/api/cv/ingest?file_id=${encodeURIComponent(
-                        fileId
-                    )}`,
+                    `${backendUrl}/api/cv/ingest?file_id=${encodeURIComponent(fileId)}`,
                     {
                         method: 'POST',
                         headers: {
@@ -154,7 +150,6 @@ export default function InitialCVUpload({
                     const ingestError = await ingestResponse.json()
                     console.error('Ingest error:', ingestError)
                     setWarning('Parsing could not finish. You can re-upload to retry.')
-                    // Still consider upload successful even if ingest fails initially
                 } else {
                     const ingestData = await ingestResponse.json()
                     console.log('Ingest successful:', ingestData)
@@ -163,7 +158,6 @@ export default function InitialCVUpload({
             } catch (ingestError) {
                 console.error('Ingest request failed:', ingestError)
                 setWarning('Parsing could not finish. You can re-upload to retry.')
-                // Don't fail the upload if ingest fails
             }
 
             setStage('indexing')
@@ -203,24 +197,6 @@ export default function InitialCVUpload({
             uploadFile(files[0])
         }
     }
-
-    const previewJobs = [
-        {
-            role: 'ML Engineer',
-            company: 'Parium',
-            match: '81%',
-        },
-        {
-            role: 'Backend Engineer',
-            company: 'Giri Lab',
-            match: '79%',
-        },
-        {
-            role: 'Data Engineer',
-            company: 'Nova',
-            match: '76%',
-        },
-    ]
 
     return (
         <div className="max-w-6xl mx-auto space-y-10">
@@ -402,33 +378,6 @@ export default function InitialCVUpload({
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div className="space-y-4 pt-2">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-white">Your Job Feed</h2>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#171717] px-3 py-1 text-xs text-white/60">
-                        <Lock className="h-3 w-3" />
-                        Locked
-                    </div>
-                </div>
-                <div className="grid md:grid-cols-3 gap-4 opacity-60">
-                    {previewJobs.map((job) => (
-                        <div
-                            key={job.role}
-                            className="rounded-xl border border-white/10 bg-[#171717] p-4"
-                        >
-                            <div className="text-sm text-white/60">{job.company}</div>
-                            <div className="text-white font-medium mt-1">{job.role}</div>
-                            <div className="mt-3 inline-flex items-center gap-2 text-xs text-white/60 rounded-full border border-white/10 px-2 py-1">
-                                Match {job.match}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                <p className="text-sm text-white/50">
-                    Upload your resume to see job matches tailored to your profile.
-                </p>
             </div>
         </div>
     )

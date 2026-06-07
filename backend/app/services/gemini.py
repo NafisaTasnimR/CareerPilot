@@ -17,14 +17,11 @@ def get_client() -> genai.Client:
 
 def generate_text(prompt: str, model: str) -> str:
     client = get_client()
-    try:
-        response = client.models.generate_content(model=model, contents=prompt)
-        return (getattr(response, "text", "") or "").strip()
-    except Exception as e:
-        # Log error and return empty string or raise depending on requirements
-        # return ""
-        print(f"generate_text error (model={model}): {str(e)}")  # log the real error
-        raise
+    response = client.models.generate_content(model=model, contents=prompt)
+    text = (getattr(response, "text", "") or "").strip()
+    if not text:
+        raise ValueError("Gemini returned empty response")
+    return text
 
 def _extract_embedding_values(response: object) -> list[float]:
     # The response contains an 'embeddings' list of ContentEmbedding objects

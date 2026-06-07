@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
     LayoutDashboard,
     Briefcase,
-    FileText,
+    Upload,
     Bot,
     LineChart,
     Settings,
@@ -21,8 +21,8 @@ import { useAuth } from './authentication/auth-provider'
 
 const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/cv-upload', label: 'CV Upload', icon: Upload },
     { href: '/jobs', label: 'Job Hunter', icon: Briefcase },
-    { href: '/check-resume', label: 'Check Resume', icon: FileText },
     { href: '/assistant', label: 'AI Assistant', icon: Bot },
     { href: '/tracker', label: 'Track Progress', icon: LineChart },
     { href: '/settings', label: 'Settings', icon: Settings },

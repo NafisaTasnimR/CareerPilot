@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes.router import api_router
-from app.scheduler import start_scheduler
+from app.services.scheduler import start_scheduler
 from app.models import User  # Import models to register them with SQLAlchemy
 from app.core.firebase_init import initialize_firebase
 from fastapi import Request

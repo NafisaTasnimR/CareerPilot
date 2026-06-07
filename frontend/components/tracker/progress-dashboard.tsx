@@ -2,8 +2,18 @@
 
 import { useState, useEffect, useRef } from 'react'
 
+const USER_ID = 'test-user'
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+
 export default function ProgressDashboard({ userId, api }: { userId: string; api: string }) {
-  const [stats, setStats] = useState<any>(null)
+  // Use hardcoded values same as tracker page, falling back to props
+  const effectiveUserId = USER_ID
+  const effectiveApi   = API
+
+  const [stats, setStats]   = useState<any>(null)
+  const [error, setError]   = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
   const canvasRef   = useRef<HTMLCanvasElement>(null)
   const rafRef      = useRef<number | null>(null)
   const progressRef = useRef(0)
@@ -11,16 +21,57 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
   const loopStarted = useRef(false)
 
   useEffect(() => {
-    fetch(`${api}/progress/stats?user_id=${userId}`)
-      .then(r => r.json()).then(setStats).catch(console.error)
-  }, [])
+    setLoading(true)
+    setError(null)
+
+    fetch(`${effectiveApi}/progress/stats?user_id=${effectiveUserId}`)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
+      .then(data => {
+        // Guard: ensure we got an object, not null/array
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          setStats(data)
+        } else {
+          // API returned something unexpected — use safe defaults
+          setStats({
+            total_applications: 0,
+            weekly_applications: 0,
+            status_breakdown: {},
+            tasks_completed: 0,
+            tasks_total: 0,
+            roadmap_percent: 0,
+            goals_completed: 0,
+            goals_total: 0,
+          })
+        }
+      })
+      .catch(err => {
+        console.error('Progress stats fetch failed:', err)
+        setError(err.message)
+        // Show empty dashboard rather than infinite loading
+        setStats({
+          total_applications: 0,
+          weekly_applications: 0,
+          status_breakdown: {},
+          tasks_completed: 0,
+          tasks_total: 0,
+          roadmap_percent: 0,
+          goals_completed: 0,
+          goals_total: 0,
+        })
+      })
+      .finally(() => setLoading(false))
+  }, [effectiveUserId, effectiveApi])
 
   useEffect(() => {
     if (!stats) return
     const taskPct = stats.tasks_total > 0 ? (stats.tasks_completed / stats.tasks_total) * 100 : 0
     const goalPct = stats.goals_total > 0 ? (stats.goals_completed / stats.goals_total) * 100 : 0
-    const appPct  = Math.min(stats.total_applications / 20, 1) * 100
+    const appPct  = Math.min((stats.total_applications ?? 0) / 20, 1) * 100
     targetRef.current = Math.round(taskPct * 0.5 + goalPct * 0.3 + appPct * 0.2) / 100
+
     if (canvasRef.current && !loopStarted.current) {
       const canvas = canvasRef.current
       canvas.width  = canvas.clientWidth  * window.devicePixelRatio
@@ -30,7 +81,9 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
     }
   }, [stats])
 
-  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }, [])
+  useEffect(() => () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+  }, [])
 
   function startLoop(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d')!
@@ -51,12 +104,12 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
       progressRef.current += (targetRef.current - progressRef.current) * 0.015
       const p = progressRef.current
 
-      // ── SKY ──────────────────────────────────────────────────────
+      // SKY
       const skyGrad = ctx.createLinearGradient(0, 0, 0, H)
       skyGrad.addColorStop(0,    '#5e8fae')
       skyGrad.addColorStop(0.55, '#8ab4cc')
       skyGrad.addColorStop(0.78, '#a8c8dc')
-      skyGrad.addColorStop(1,    '#1c1c1c')   // fade into card bg
+      skyGrad.addColorStop(1,    '#1c1c1c')
       ctx.fillStyle = skyGrad
       ctx.fillRect(0, 0, W, H)
 
@@ -75,12 +128,10 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
       }
       ctx.restore()
 
-      // ── ARCH — full width, low dramatic angle ─────────────────────
-      // Starts bottom-left, peaks upper-center, ends bottom-right
+      // ARCH
       const ax0 = -W * 0.04,  ay0 = H * 1.1
       const acx  = W * 0.50,  acy  = H * 0.12
       const ax1  = W * 1.04,  ay1  = H * 1.1
-
       const thick = H * 0.16
 
       ctx.beginPath()
@@ -95,7 +146,6 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
       ctx.fillStyle = ag
       ctx.fill()
 
-      // Top edge
       ctx.beginPath()
       ctx.moveTo(ax0, ay0)
       ctx.quadraticCurveTo(acx, acy, ax1, ay1)
@@ -103,7 +153,7 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
       ctx.lineWidth = 2.5
       ctx.stroke()
 
-      // Railings — full arch, both sides
+      // Railings
       ctx.save()
       ctx.globalAlpha = 0.45
       const posts: [number,number][] = []
@@ -116,33 +166,27 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
         ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx, ry - H*0.07)
         ctx.strokeStyle = '#48556e'; ctx.lineWidth = 1.5; ctx.stroke()
       }
-      // Top handrail
       ctx.beginPath()
       posts.forEach(([rx,ry],i) => i===0 ? ctx.moveTo(rx, ry-H*0.07) : ctx.lineTo(rx, ry-H*0.07))
       ctx.strokeStyle = '#38455e'; ctx.lineWidth = 1.2; ctx.stroke()
       ctx.restore()
 
-      // ── GOAL MARKER at arch end ───────────────────────────────────
+      // GOAL MARKER
       const goalT  = 0.84
       const gmt    = 1 - goalT
       const goalX  = gmt*gmt*ax0 + 2*gmt*goalT*acx + goalT*goalT*ax1
       const goalY  = gmt*gmt*ay0 + 2*gmt*goalT*acy + goalT*goalT*ay1
       const flagH  = H * 0.22
 
-      // Pole glow
       ctx.save()
       ctx.shadowColor = 'rgba(226,75,74,0.5)'
       ctx.shadowBlur  = 12
-
-      // Flag pole
       ctx.beginPath()
       ctx.moveTo(goalX, goalY)
       ctx.lineTo(goalX, goalY - flagH)
       ctx.strokeStyle = '#c0c8d8'
       ctx.lineWidth = 2.5
       ctx.stroke()
-
-      // Flag body
       ctx.beginPath()
       ctx.moveTo(goalX, goalY - flagH)
       ctx.lineTo(goalX - W * 0.075, goalY - flagH + H * 0.05)
@@ -152,7 +196,6 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
       ctx.fill()
       ctx.restore()
 
-      // "GOAL" text — bright, prominent
       ctx.save()
       ctx.font = `700 ${Math.max(13, W * 0.018)}px -apple-system, sans-serif`
       ctx.fillStyle = '#ffffff'
@@ -162,8 +205,7 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
       ctx.fillText('GOAL', goalX - W * 0.025, goalY - flagH - H * 0.03)
       ctx.restore()
 
-      // ── FIGURE ───────────────────────────────────────────────────
-      // Full arch: figure goes from left base (t≈0.04) to right base (t≈0.96)
+      // FIGURE
       const figT = 0.04 + p * 0.92
       const fmt  = 1 - figT
       const figX = fmt*fmt*ax0 + 2*fmt*figT*acx + figT*figT*ax1
@@ -181,7 +223,6 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
       ctx.translate(figX, figY)
       ctx.rotate(ang)
 
-      // Shadow
       ctx.save()
       ctx.globalAlpha = 0.12
       ctx.scale(1, 0.2)
@@ -192,33 +233,28 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
 
       const sw = Math.sin(legPhase), cw = Math.cos(legPhase)
 
-      // Back leg
       ctx.save(); ctx.rotate(sw*0.2)
       ctx.beginPath(); ctx.moveTo(S*0.04,-S*0.2); ctx.quadraticCurveTo(S*0.09,-S*0.05,S*0.13,S*0.04)
       ctx.lineWidth=S*0.1; ctx.lineCap='round'; ctx.strokeStyle=fc; ctx.stroke()
       ctx.beginPath(); ctx.ellipse(S*0.16,S*0.04,S*0.085,S*0.032,0.2,0,Math.PI*2)
       ctx.fillStyle=fc; ctx.fill(); ctx.restore()
 
-      // Front leg
       ctx.save(); ctx.rotate(-sw*0.2)
       ctx.beginPath(); ctx.moveTo(-S*0.04,-S*0.2); ctx.quadraticCurveTo(-S*0.09,-S*0.05,-S*0.13,S*0.04)
       ctx.lineWidth=S*0.1; ctx.lineCap='round'; ctx.strokeStyle=fc; ctx.stroke()
       ctx.beginPath(); ctx.ellipse(-S*0.16,S*0.04,S*0.085,S*0.032,-0.2,0,Math.PI*2)
       ctx.fillStyle=fc; ctx.fill(); ctx.restore()
 
-      // Torso
       ctx.beginPath()
       ctx.moveTo(-S*0.12,-S*0.2); ctx.lineTo(S*0.12,-S*0.2)
       ctx.lineTo(S*0.15,-S*0.58); ctx.lineTo(-S*0.15,-S*0.58); ctx.closePath()
       ctx.fillStyle=fc; ctx.fill()
 
-      // Backpack — on the BACK (negative x, behind torso)
       ctx.beginPath(); ctx.rect(-S*0.31,-S*0.56,S*0.19,S*0.3)
       ctx.fillStyle='#161c2a'; ctx.fill()
       ctx.beginPath(); ctx.moveTo(-S*0.12,-S*0.54); ctx.quadraticCurveTo(-S*0.08,-S*0.4,-S*0.05,-S*0.3)
       ctx.lineWidth=S*0.035; ctx.strokeStyle='#161c2a'; ctx.stroke()
 
-      // Arms
       ctx.save(); ctx.rotate(cw*0.18)
       ctx.beginPath(); ctx.moveTo(S*0.11,-S*0.5); ctx.lineTo(S*0.23,-S*0.3)
       ctx.lineWidth=S*0.09; ctx.lineCap='round'; ctx.strokeStyle=fc; ctx.stroke(); ctx.restore()
@@ -226,20 +262,14 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
       ctx.beginPath(); ctx.moveTo(-S*0.11,-S*0.5); ctx.lineTo(-S*0.23,-S*0.32)
       ctx.lineWidth=S*0.09; ctx.lineCap='round'; ctx.strokeStyle=fc; ctx.stroke(); ctx.restore()
 
-      // Neck
       ctx.beginPath(); ctx.rect(-S*0.045,-S*0.66,S*0.09,S*0.1); ctx.fillStyle=fc; ctx.fill()
-
-      // Head
       ctx.beginPath(); ctx.ellipse(0,-S*0.82,S*0.13,S*0.16,0,0,Math.PI*2); ctx.fillStyle=fc; ctx.fill()
-
-      // Cap
       ctx.beginPath(); ctx.ellipse(0,-S*0.96,S*0.12,S*0.05,0,Math.PI,Math.PI*2); ctx.fillStyle=fc; ctx.fill()
       ctx.beginPath(); ctx.moveTo(-S*0.02,-S*0.96); ctx.lineTo(S*0.21,-S*0.92)
       ctx.lineTo(S*0.17,-S*0.88); ctx.lineTo(-S*0.02,-S*0.92); ctx.fillStyle=fc; ctx.fill()
 
       ctx.restore()
 
-      // % label above figure (hide near start/end to avoid overlap)
       const pctVal = Math.round(progressRef.current * 100)
       ctx.save()
       ctx.font = `500 ${Math.max(12,W*0.016)}px -apple-system, sans-serif`
@@ -250,7 +280,7 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
       ctx.fillText(`${pctVal}%`, figX, figY - S * 1.2)
       ctx.restore()
 
-      // ── BOTTOM FADE into dark bg ──────────────────────────────────
+      // Bottom fade
       const fadeGrad = ctx.createLinearGradient(0, H*0.72, 0, H)
       fadeGrad.addColorStop(0, 'rgba(28,28,28,0)')
       fadeGrad.addColorStop(1, 'rgba(28,28,28,1)')
@@ -262,18 +292,38 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
     draw()
   }
 
-  if (!stats) return <p style={{ color: '#6b7280' }}>Loading stats...</p>
+  // ── loading / error states ────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          {['Total applications','This week','Tasks completed','Roadmap progress'].map(label => (
+            <div key={label} style={{ background: '#1c1c1c', border: '1px solid #2a2a2a', borderRadius: 12, padding: '16px 18px' }}>
+              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>{label}</div>
+              <div style={{ fontSize: 24, fontWeight: 600, color: '#2a2a2a', background: '#2a2a2a', borderRadius: 4, width: 48, height: 28 }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ background: '#1c1c1c', border: '1px solid #2a2a2a', borderRadius: 16, padding: 40, textAlign: 'center' }}>
+          <p style={{ color: '#6b7280', fontSize: 14 }}>Loading your progress...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── render ────────────────────────────────────────────────────────────────
 
   const taskPct = stats.tasks_total > 0 ? (stats.tasks_completed / stats.tasks_total) * 100 : 0
   const goalPct = stats.goals_total > 0 ? (stats.goals_completed / stats.goals_total) * 100 : 0
-  const appPct  = Math.min(stats.total_applications / 20, 1) * 100
+  const appPct  = Math.min((stats.total_applications ?? 0) / 20, 1) * 100
   const pct     = Math.round(taskPct * 0.5 + goalPct * 0.3 + appPct * 0.2)
-  const total   = stats.total_applications || 1
+  const total   = Math.max(stats.total_applications || 1, 1)
 
   const statCards = [
-    { label: 'Total applications', value: stats.total_applications },
-    { label: 'This week',          value: stats.weekly_applications },
-    { label: 'Tasks completed',    value: `${stats.tasks_completed}/${stats.tasks_total}` },
+    { label: 'Total applications', value: stats.total_applications ?? 0 },
+    { label: 'This week',          value: stats.weekly_applications ?? 0 },
+    { label: 'Tasks completed',    value: `${stats.tasks_completed ?? 0}/${stats.tasks_total ?? 0}` },
     { label: 'Roadmap progress',   value: `${pct}%` },
   ]
 
@@ -283,6 +333,14 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {error && (
+        <div style={{ background: '#1f1215', border: '1px solid #3f1820', borderRadius: 8, padding: '10px 16px' }}>
+          <p style={{ color: '#f87171', fontSize: 13, margin: 0 }}>
+            ⚠️ Could not reach backend ({error}). Showing empty state.
+          </p>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {statCards.map(card => (
           <div key={card.label} style={{ background: '#1c1c1c', border: '1px solid #2a2a2a', borderRadius: 12, padding: '16px 18px' }}>
@@ -308,21 +366,25 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
         <p style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 16px 0' }}>
           Application status breakdown
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-          {Object.entries(stats.status_breakdown || {}).map(([status, count]: any) => {
-            const barColor = statusColors[status] || '#6b7280'
-            const w = Math.round((count / total) * 100)
-            return (
-              <div key={status} style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 28, fontWeight: 600, color: 'white' }}>{count}</div>
-                <div style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 8px' }}>{status}</div>
-                <div style={{ height: 4, background: '#2a2a2a', borderRadius: 2, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 2, background: barColor, width: `${w}%`, transition: 'width 1.2s cubic-bezier(.4,0,.2,1)' }} />
+        {Object.keys(stats.status_breakdown || {}).length === 0 ? (
+          <p style={{ color: '#4b5563', fontSize: 13 }}>No applications yet — add your first one in the Applications tab.</p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            {Object.entries(stats.status_breakdown || {}).map(([status, count]: any) => {
+              const barColor = statusColors[status] || '#6b7280'
+              const w = Math.round((count / total) * 100)
+              return (
+                <div key={status} style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 28, fontWeight: 600, color: 'white' }}>{count}</div>
+                  <div style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 8px' }}>{status}</div>
+                  <div style={{ height: 4, background: '#2a2a2a', borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 2, background: barColor, width: `${w}%`, transition: 'width 1.2s cubic-bezier(.4,0,.2,1)' }} />
+                  </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -29,6 +29,12 @@ interface CVEmbeddedDataResponse {
     sections: CVEmbeddedSection[]
 }
 
+type FeedRole = {
+    title: string
+    reason: string
+    match_score: number
+}
+
 const SECTION_ALIASES: Record<string, string[]> = {
     experience: ['experience', 'work experience', 'professional experience', 'employment history', 'career history'],
     education: ['education', 'education and training', 'academic background', 'academic history', 'qualifications'],
@@ -50,12 +56,10 @@ function summarizeContent(text: string, limit: number = SUMMARY_LIMIT) {
     const cleaned = text.replace(/\s+/g, ' ').trim()
     if (!cleaned) return ''
     if (cleaned.length <= limit) return cleaned
-
     const sentenceEnd = cleaned.search(/[.!?]/)
     if (sentenceEnd > 40 && sentenceEnd < limit) {
         return cleaned.slice(0, sentenceEnd + 1)
     }
-
     return `${cleaned.slice(0, limit).trim()}...`
 }
 
@@ -113,6 +117,110 @@ function getHighlights(items: CVParsedItem[], maxItems = 3) {
     }))
 }
 
+// ── Recommended Roles Widget ───────────────────────────────────────────────────
+
+function JobFeedWidget({ fileId }: { fileId: string }) {
+    const [roles, setRoles] = useState<FeedRole[]>([])
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(false)
+
+    useEffect(() => {
+        async function fetchFeed() {
+            const cacheKey = `jobFeed_${fileId}`
+            const cached = localStorage.getItem(cacheKey)
+            if (cached) {
+                try {
+                    setRoles(JSON.parse(cached))
+                    setLoading(false)
+                    return
+                } catch { }
+            }
+
+            try {
+                const res = await fetch(
+                    `${getBackendUrl()}/api/jobs/feed?file_id=${encodeURIComponent(fileId)}`
+                )
+                if (!res.ok) throw new Error()
+                const data: FeedRole[] = await res.json()
+                localStorage.setItem(cacheKey, JSON.stringify(data))
+                setRoles(data)
+            } catch {
+                setError(true)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchFeed()
+    }, [fileId])
+
+    const scoreColor = (score: number) =>
+        score >= 70 ? '#4ade80' : score >= 40 ? '#facc15' : '#f87171'
+
+    return (
+        <div className="rounded-xl border border-white/15 bg-[#171717] p-5 space-y-4">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h3 className="text-white font-semibold text-sm">Recommended Roles</h3>
+                    <p className="text-white/40 text-xs mt-0.5">Tailored to your CV</p>
+                </div>
+            </div>
+
+            {/* Loading skeleton */}
+            {loading && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[1, 2, 3].map((i) => (
+                        <div key={i} className="rounded-xl border border-white/10 bg-[#202020] p-4 animate-pulse space-y-2">
+                            <div className="h-4 bg-white/10 rounded w-3/4" />
+                            <div className="h-3 bg-white/10 rounded w-full" />
+                            <div className="h-3 bg-white/10 rounded w-2/3" />
+                            <div className="h-5 bg-white/10 rounded-full w-1/3 mt-2" />
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Role cards */}
+            {!loading && !error && roles.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {roles.map((role, i) => (
+                        <div
+                            key={i}
+                            className="rounded-xl border border-white/10 bg-[#202020] p-4 space-y-2"
+                        >
+                            <p className="text-white font-medium text-sm leading-snug">
+                                {role.title}
+                            </p>
+                            <p className="text-white/40 text-xs leading-relaxed line-clamp-2">
+                                {role.reason}
+                            </p>
+                            <div className="pt-1">
+                                <span
+                                    className="text-[11px] border rounded-full px-2.5 py-0.5"
+                                    style={{
+                                        color: scoreColor(role.match_score),
+                                        borderColor: scoreColor(role.match_score) + '40',
+                                        backgroundColor: scoreColor(role.match_score) + '15',
+                                    }}
+                                >
+                                    {role.match_score}% match
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {!loading && (error || roles.length === 0) && (
+                <p className="text-white/40 text-xs">
+                    Upload your resume to see roles tailored to your profile.
+                </p>
+            )}
+        </div>
+    )
+}
+
+// ── Main dashboard ─────────────────────────────────────────────────────────────
+
 interface DashboardProps {
     fileId: string
     fileName: string
@@ -142,7 +250,7 @@ export default function DashboardContent({
         projects: [],
     })
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
-    const [pagination, setPagination] = useState({ limit: 50, offset: 0 })
+    const [pagination] = useState({ limit: 50, offset: 0 })
 
     useEffect(() => {
         let cancelled = false
@@ -170,37 +278,38 @@ export default function DashboardContent({
                 )
 
                 if (!response.ok) {
-                    const payload = await response.json().catch(() => null)
-                    throw new Error(payload?.detail || 'Failed to load resume data')
+                    throw new Error(`Failed to load resume data: ${response.status}`)
                 }
 
-                const data = (await response.json()) as CVEmbeddedDataResponse
+                const data: CVEmbeddedDataResponse = await response.json()
                 if (cancelled) return
 
-                const nextParsedData = {
-                    experience: [] as CVParsedItem[],
-                    education: [] as CVParsedItem[],
-                    skills: [] as CVParsedItem[],
-                    projects: [] as CVParsedItem[],
+                setCollection(data.collection)
+                setLiveChunkCount(data.chunk_count)
+
+                const grouped: {
+                    experience: CVParsedItem[]
+                    education: CVParsedItem[]
+                    skills: CVParsedItem[]
+                    projects: CVParsedItem[]
+                } = {
+                    experience: [],
+                    education: [],
+                    skills: [],
+                    projects: [],
                 }
 
                 data.sections.forEach((section) => {
-                    const sectionKey = normalizeSectionKey(section.section) as keyof typeof nextParsedData
-                    if (sectionKey in nextParsedData) {
-                        nextParsedData[sectionKey] = section.items.filter(item => item.content && item.content.trim().length > 0)
+                    const key = normalizeSectionKey(section.section)
+                    if (key in grouped) {
+                        grouped[key as keyof typeof grouped].push(...section.items)
                     }
                 })
 
-                setParsedData(nextParsedData)
-                setCollection(data.collection)
-                setLiveChunkCount(data.chunk_count)
-            } catch (fetchError) {
+                setParsedData(grouped)
+            } catch (err) {
                 if (!cancelled) {
-                    const message =
-                        fetchError instanceof Error
-                            ? fetchError.message
-                            : 'Failed to load resume data'
-                    setError(message)
+                    setError(err instanceof Error ? err.message : 'Failed to load resume data')
                 }
             } finally {
                 if (!cancelled) setLoading(false)
@@ -211,25 +320,18 @@ export default function DashboardContent({
         return () => { cancelled = true }
     }, [fileId, pagination])
 
+    const toggleSection = (key: string) => {
+        setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }))
+    }
+
+    const skillTags = extractSkillTags(parsedData.skills)
+
     const sectionConfig = [
         { key: 'experience', title: 'Experience', icon: Briefcase },
         { key: 'education', title: 'Education', icon: BookOpen },
         { key: 'skills', title: 'Skills', icon: Code },
         { key: 'projects', title: 'Projects', icon: Zap },
     ]
-
-    const splitSkills = (text: string) => {
-        return text
-            .split(/,|\s{2,}| - /)
-            .map(s => s.trim())
-            .filter(Boolean)
-    }
-
-    const skillTags = splitSkills(parsedData.skills.map(s => s.content).join(', '))
-
-    const toggleSection = (key: string) => {
-        setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }))
-    }
 
     if (loading) {
         return (
@@ -263,7 +365,8 @@ export default function DashboardContent({
     }
 
     return (
-        <div className="space-y-6 max-w-5xl mx-auto">
+        <div className="space-y-6 max-w-5xl">
+
             {/* Header */}
             <div className="flex items-start justify-between gap-4">
                 <div>
@@ -379,23 +482,98 @@ export default function DashboardContent({
                                                 ) : (
                                                     <p className="text-white/50 text-sm">No skills found in your resume</p>
                                                 )}
+                                                {isExpanded && (
+                                                    <div className="w-full pt-4 border-t border-white/10 space-y-3">
+                                                        {data.map((item, idx) => (
+                                                            <div
+                                                                key={`${section.key}-detail-${idx}`}
+                                                                className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3"
+                                                            >
+                                                                <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-2">
+                                                                    {section.title} {idx + 1}
+                                                                </p>
+                                                                <div className="text-sm leading-relaxed space-y-1">
+                                                                    {formatParsedContent(item.content).map((element, i) => (
+                                                                        <div key={`${section.key}-content-${idx}-${i}`}>
+                                                                            {element}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {isExpanded && (
+                                                    <div className="w-full pt-4 border-t border-white/10 space-y-3">
+                                                        {data.map((item, idx) => (
+                                                            <div
+                                                                key={`${section.key}-detail-${idx}`}
+                                                                className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3"
+                                                            >
+                                                                <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-2">
+                                                                    {section.title} {idx + 1}
+                                                                </p>
+                                                                <div className="text-sm leading-relaxed space-y-1">
+                                                                    {formatParsedContent(item.content).map((element, i) => (
+                                                                        <div key={`${section.key}-content-${idx}-${i}`}>
+                                                                            {element}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : isExpanded ? (
+                                            // When expanded — show only the detailed cards, NOT the highlights
+                                            <div className="space-y-3">
+                                                {data.map((item, idx) => (
+                                                    <div
+                                                        key={`${section.key}-detail-${idx}`}
+                                                        className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3 space-y-2"
+                                                    >
+                                                        <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
+                                                            {section.title} {idx + 1}
+                                                        </p>
+                                                        <div className="text-sm leading-relaxed space-y-1">
+                                                            {formatParsedContent(item.content).map((element, i) => (
+                                                                <div key={`${section.key}-content-${idx}-${i}`}>
+                                                                    {element}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : isExpanded ? (
+                                            // When expanded — show only the detailed cards, NOT the highlights
+                                            <div className="space-y-3">
+                                                {data.map((item, idx) => (
+                                                    <div
+                                                        key={`${section.key}-detail-${idx}`}
+                                                        className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3 space-y-2"
+                                                    >
+                                                        <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
+                                                            {section.title} {idx + 1}
+                                                        </p>
+                                                        <div className="text-sm leading-relaxed space-y-1">
+                                                            {formatParsedContent(item.content).map((element, i) => (
+                                                                <div key={`${section.key}-content-${idx}-${i}`}>
+                                                                    {element}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
                                         ) : (
+                                            // When collapsed — show only the highlights preview
                                             <div className="space-y-4">
                                                 {highlights.map((highlight, idx) => (
                                                     <div key={`${section.key}-highlight-${idx}`} className="p-3 rounded-lg bg-white/5 border border-white/5 space-y-1">
                                                         <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">{highlight.label}</p>
                                                         <p className="text-white/80 text-sm leading-relaxed">{highlight.summary}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                        {isExpanded && (
-                                            <div className="pt-4 border-t border-white/10 space-y-6">
-                                                {data.map((item, idx) => (
-                                                    <div key={`${section.key}-detail-${idx}`} className="space-y-2">
-                                                        {item.section && <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">{item.section}</p>}
-                                                        <div className="text-sm leading-relaxed">{formatParsedContent(item.content)}</div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -412,6 +590,9 @@ export default function DashboardContent({
                     )
                 })}
             </div>
+
+            {/* Recommended Roles Widget */}
+            <JobFeedWidget fileId={fileId} />
 
             {/* Quick action cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -434,6 +615,7 @@ export default function DashboardContent({
                     </a>
                 </div>
             </div>
+
         </div>
     )
 }

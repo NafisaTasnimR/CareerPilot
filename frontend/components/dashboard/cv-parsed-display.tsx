@@ -9,10 +9,8 @@ import {
     AlertCircle,
     Loader2,
     RefreshCcw,
-    ChevronDown,
-    ChevronUp,
 } from 'lucide-react'
-import { getBackendUrl } from '@/lib/backend'
+import { getBackendUrl, getAuthHeaders } from '@/lib/backend'
 
 interface CVParsedItem {
     section: string
@@ -268,8 +266,15 @@ export default function DashboardContent({
                     limit: pagination.limit.toString(),
                     offset: pagination.offset.toString(),
                 })
+                // Get authentication headers (Firebase token)
+                const authHeaders = await getAuthHeaders()
                 const response = await fetch(
-                    `${backendUrl}/api/cv/embedded-data?${queryParams}`
+                    `${backendUrl}/api/cv/embedded-data?${queryParams}`,
+                    {
+                        headers: {
+                            'Authorization': authHeaders['Authorization'],
+                        },
+                    }
                 )
 
                 if (!response.ok) {
@@ -311,7 +316,7 @@ export default function DashboardContent({
             }
         }
 
-        loadResumeData()
+        if (fileId) loadResumeData()
         return () => { cancelled = true }
     }, [fileId, pagination])
 
@@ -432,16 +437,11 @@ export default function DashboardContent({
                     const isSkills = section.key === 'skills'
 
                     return (
-                        <div
-                            key={section.key}
-                            className="rounded-xl border border-white/15 bg-[#171717] overflow-hidden"
-                        >
+                        <div key={section.key} className="rounded-xl border border-white/15 bg-[#171717] overflow-hidden">
                             <div className="border-b border-white/10 px-5 py-4 flex items-center gap-3 bg-[#141414]">
                                 <Icon className="w-4 h-4 text-white/60" />
                                 <div>
-                                    <h2 className="text-white font-semibold text-sm">
-                                        {section.title}
-                                    </h2>
+                                    <h2 className="text-white font-semibold text-sm">{section.title}</h2>
                                     <p className="text-xs text-white/50">{data.length} entries</p>
                                 </div>
                                 {data.length > 0 && (
@@ -452,14 +452,17 @@ export default function DashboardContent({
                                     >
                                         {isExpanded ? 'Hide details' : 'Show details'}
                                         {isExpanded ? (
-                                            <ChevronUp className="w-3.5 h-3.5" />
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                            </svg>
                                         ) : (
-                                            <ChevronDown className="w-3.5 h-3.5" />
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
                                         )}
                                     </button>
                                 )}
                             </div>
-
                             <div className="p-5">
                                 {data.length > 0 ? (
                                     <div className="space-y-4">
@@ -477,9 +480,28 @@ export default function DashboardContent({
                                                             </span>
                                                         ))
                                                 ) : (
-                                                    <p className="text-white/50 text-sm">
-                                                        No skills found in your resume
-                                                    </p>
+                                                    <p className="text-white/50 text-sm">No skills found in your resume</p>
+                                                )}
+                                                {isExpanded && (
+                                                    <div className="w-full pt-4 border-t border-white/10 space-y-3">
+                                                        {data.map((item, idx) => (
+                                                            <div
+                                                                key={`${section.key}-detail-${idx}`}
+                                                                className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3"
+                                                            >
+                                                                <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold mb-2">
+                                                                    {section.title} {idx + 1}
+                                                                </p>
+                                                                <div className="text-sm leading-relaxed space-y-1">
+                                                                    {formatParsedContent(item.content).map((element, i) => (
+                                                                        <div key={`${section.key}-content-${idx}-${i}`}>
+                                                                            {element}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 )}
                                                 {isExpanded && (
                                                     <div className="w-full pt-4 border-t border-white/10 space-y-3">
@@ -524,17 +546,34 @@ export default function DashboardContent({
                                                     </div>
                                                 ))}
                                             </div>
+                                        ) : isExpanded ? (
+                                            // When expanded — show only the detailed cards, NOT the highlights
+                                            <div className="space-y-3">
+                                                {data.map((item, idx) => (
+                                                    <div
+                                                        key={`${section.key}-detail-${idx}`}
+                                                        className="rounded-lg border border-white/8 bg-white/[0.03] px-4 py-3 space-y-2"
+                                                    >
+                                                        <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
+                                                            {section.title} {idx + 1}
+                                                        </p>
+                                                        <div className="text-sm leading-relaxed space-y-1">
+                                                            {formatParsedContent(item.content).map((element, i) => (
+                                                                <div key={`${section.key}-content-${idx}-${i}`}>
+                                                                    {element}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         ) : (
                                             // When collapsed — show only the highlights preview
                                             <div className="space-y-4">
                                                 {highlights.map((highlight, idx) => (
                                                     <div key={`${section.key}-highlight-${idx}`} className="p-3 rounded-lg bg-white/5 border border-white/5 space-y-1">
-                                                        <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
-                                                            {highlight.label}
-                                                        </p>
-                                                        <p className="text-white/80 text-sm leading-relaxed">
-                                                            {highlight.summary}
-                                                        </p>
+                                                        <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">{highlight.label}</p>
+                                                        <p className="text-white/80 text-sm leading-relaxed">{highlight.summary}</p>
                                                     </div>
                                                 ))}
                                             </div>

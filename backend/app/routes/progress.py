@@ -30,9 +30,9 @@ async def get_current_user(
 
 @router.get("/stats")
 def get_stats(current_user = Depends(get_current_user)):
-    apps = supabase.table("applications").select("*").eq("user_id", current_user.firebase_uid).execute().data
-    tasks = supabase.table("tasks").select("*").eq("user_id", current_user.firebase_uid).execute().data
-    goals = supabase.table("goals").select("*").eq("user_id", current_user.firebase_uid).execute().data
+    apps = supabase.table("applications").select("*").eq("user_id", current_user["firebase_uid"]).execute().data
+    tasks = supabase.table("tasks").select("*").eq("user_id", current_user["firebase_uid"]).execute().data
+    goals = supabase.table("goals").select("*").eq("user_id", current_user["firebase_uid"]).execute().data
 
     # Weekly applications (last 7 days)
     week_ago = (datetime.now() - timedelta(days=7)).isoformat()

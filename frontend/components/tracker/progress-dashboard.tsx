@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { auth } from '@/lib/firebase'
 
-const USER_ID = 'test-user-123'
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
 const ACCENT  = '#d4a853'
 const DIM     = '#2e2e2e'
@@ -20,8 +19,8 @@ const STATUS_META = [
 ]
 
 export default function ProgressDashboard({ userId, api }: { userId: string; api: string }) {
-  const effectiveUserId = USER_ID
-  const effectiveApi   = API
+  const effectiveUserId = userId
+  const effectiveApi   = api
 
   const [stats, setStats]       = useState<any>(null)
   const [error, setError]       = useState<string | null>(null)
@@ -35,12 +34,27 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
   const loopStarted = useRef(false)
 
   useEffect(() => {
-    setLoading(true); setError(null)
-    fetch(`${effectiveApi}/progress/stats?user_id=${effectiveUserId}`)
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-      .then(data => setStats(data && typeof data === 'object' && !Array.isArray(data) ? data : emptyStats()))
-      .catch(err => { setError(err.message); setStats(emptyStats()) })
-      .finally(() => setLoading(false))
+    async function loadStats() {
+      setLoading(true); setError(null)
+      try {
+        const token = await auth.currentUser?.getIdToken()
+        const res = await fetch(`${effectiveApi}/progress/stats`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          }
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        setStats(data && typeof data === 'object' && !Array.isArray(data) ? data : emptyStats())
+      } catch (err: any) {
+        setError(err.message); setStats(emptyStats())
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadStats()
+    // eslint-disable-next-line
   }, [effectiveUserId, effectiveApi])
 
   useEffect(() => {

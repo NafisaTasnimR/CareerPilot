@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from google import genai
+from groq import Groq
 
 import firebase_admin
 from firebase_admin import auth as firebase_auth
@@ -19,7 +19,7 @@ from app.db import supabase
 router = APIRouter(prefix="/kanban", tags=["kanban"])
 security = HTTPBearer()
 
-_genai_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+_groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 VALID_STATUSES = ["Applied", "Interviewing", "Offer", "Rejected"]
 
@@ -138,25 +138,33 @@ def generate_cover_letter(req: CoverLetterRequest):
     ]
     style = random.choice(styles)
 
-    prompt = f"""Write a professional cover letter for this job. Style: {style}.
+    prompt = f"""Write a professional job application cover letter. Style: {style}.
 
 Company: {req.company}
 Role: {req.role}
-{f"Notes: {req.notes}" if req.notes else ""}
+{f"Additional context: {req.notes}" if req.notes else ""}
 {f"Candidate background: {cv_context[:1500]}" if cv_context else ""}
 
-Rules:
-- 3 paragraphs, under 280 words
-- Style must be: {style}
-- No placeholder text like [Your Name]
-- Do NOT repeat the previous version — this must be meaningfully different"""
+Requirements:
+- Start with "Dear Hiring Manager," 
+- Paragraph 1: Why you want THIS role at THIS company specifically
+- Paragraph 2: Your most relevant experience and achievements for this role
+- Paragraph 3: Brief closing expressing enthusiasm and call to action
+- End with "Sincerely," followed by a blank line for the signature
+- Under 300 words total
+- Style: {style}
+- Sound human and specific, NOT generic
+- Do NOT use placeholder text like [Your Name] or [Date]
+- Do NOT write a story about a past incident unless it directly relates to the role"""
 
     try:
-        response = _genai_client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
+        response = _groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=600,
+            temperature=0.7,
         )
-        cover_letter = (getattr(response, "text", "") or "").strip()
+        cover_letter = response.choices[0].message.content.strip()
     except Exception as e:
         cover_letter = f"Failed to generate: {str(e)}"
 

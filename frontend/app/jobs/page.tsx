@@ -8,6 +8,7 @@ import {
     Clock, Building2, Banknote, Calendar, X, Bookmark, BookmarkCheck
 } from 'lucide-react'
 import { getBackendUrl } from '@/lib/backend'
+import { useAuth } from '@/components/authentication/auth-provider'
 
 type JobCard = {
     job_id: string
@@ -154,7 +155,6 @@ function JobCardItem({ job, userId }: { job: JobCard; userId: string | null }) {
 
     return (
         <div className="group rounded-xl border border-[#3a3b3b] bg-[#1f2020] hover:border-[#4a4b4b] hover:bg-[#222323] transition-all duration-200">
-            {/* Top section */}
             <div className="p-5 pb-4">
                 <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
@@ -205,52 +205,26 @@ function JobCardItem({ job, userId }: { job: JobCard; userId: string | null }) {
                 </div>
             </div>
 
-            {/* Info pills */}
             <div className="px-5 pb-4">
                 <div className="flex flex-wrap gap-2">
-                    <InfoPill
-                        icon={Banknote}
-                        label="Salary"
-                        value={job.salary_range || 'Not specified'}
-                    />
-                    <InfoPill
-                        icon={Calendar}
-                        label="Deadline"
-                        value={deadlineLabel || 'Not specified'}
-                    />
-                    <InfoPill
-                        icon={Briefcase}
-                        label="Type"
-                        value={employmentLabel || 'Not specified'}
-                    />
-                    {postedLabel && (
-                        <InfoPill
-                            icon={Clock}
-                            label="Posted"
-                            value={postedLabel}
-                        />
-                    )}
+                    <InfoPill icon={Banknote} label="Salary" value={job.salary_range || 'Not specified'} />
+                    <InfoPill icon={Calendar} label="Deadline" value={deadlineLabel || 'Not specified'} />
+                    <InfoPill icon={Briefcase} label="Type" value={employmentLabel || 'Not specified'} />
+                    {postedLabel && <InfoPill icon={Clock} label="Posted" value={postedLabel} />}
                 </div>
             </div>
 
-            {/* AI Analysis */}
             <div className="mx-5 mb-4 rounded-lg bg-[#242525] border border-[#3a3b3b] px-3.5 py-3 space-y-3">
                 <div className="text-[10px] tracking-widest text-gray-600 uppercase">AI Analysis</div>
                 <p className="text-xs text-gray-400 leading-relaxed italic">
                     "{job.fit_reason}"
                 </p>
-
                 {job.missing_skills && job.missing_skills.length > 0 && (
                     <div className="space-y-1.5">
-                        <div className="text-[10px] tracking-widest text-gray-600 uppercase">
-                            Skill gaps
-                        </div>
+                        <div className="text-[10px] tracking-widest text-gray-600 uppercase">Skill gaps</div>
                         <div className="flex flex-wrap gap-1.5">
                             {job.missing_skills.map((skill) => (
-                                <span
-                                    key={skill}
-                                    className="inline-flex items-center gap-1 text-[11px] text-gray-300 bg-[#2a1f1f] border border-[#4a2a2a] rounded-md px-2 py-0.5"
-                                >
+                                <span key={skill} className="inline-flex items-center gap-1 text-[11px] text-gray-300 bg-[#2a1f1f] border border-[#4a2a2a] rounded-md px-2 py-0.5">
                                     <span className="text-[#8a4a4a]">✕</span>
                                     {skill}
                                 </span>
@@ -258,13 +232,11 @@ function JobCardItem({ job, userId }: { job: JobCard; userId: string | null }) {
                         </div>
                     </div>
                 )}
-
                 {job.missing_skills && job.missing_skills.length === 0 && job.fit_score >= 80 && (
                     <span className="inline-flex text-[11px] text-emerald-400 bg-emerald-950/30 border border-emerald-900/40 rounded-md px-2 py-0.5">
                         ✓ Strong profile match — no major gaps
                     </span>
                 )}
-
                 {job.missing_skills && job.missing_skills.length === 0 && job.fit_score < 80 && (
                     <span className="inline-flex text-[11px] text-gray-400 bg-[#2a2b2b] border border-[#3a3b3b] rounded-md px-2 py-0.5">
                         No specific skill gaps identified
@@ -272,7 +244,6 @@ function JobCardItem({ job, userId }: { job: JobCard; userId: string | null }) {
                 )}
             </div>
 
-            {/* Footer */}
             <div className="px-5 pb-4 flex items-center justify-between">
                 <a
                     href={job.redirect_url}
@@ -283,11 +254,7 @@ function JobCardItem({ job, userId }: { job: JobCard; userId: string | null }) {
                     Apply now
                     <ExternalLink className="w-3 h-3" />
                 </a>
-                {sourceHost && (
-                    <span className="text-[10px] text-gray-600">
-                        via {sourceHost}
-                    </span>
-                )}
+                {sourceHost && <span className="text-[10px] text-gray-600">via {sourceHost}</span>}
             </div>
         </div>
     )
@@ -329,13 +296,15 @@ function ScoreFilterBar({
 }
 
 export default function JobsPage() {
+    const { user } = useAuth()
+    const userId = user?.uid || null
+
     const [query, setQuery] = useState('')
     const [jobs, setJobs] = useState<JobCard[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [searched, setSearched] = useState(false)
     const [fileId, setFileId] = useState<string | null>(null)
-    const [userId, setUserId] = useState<string | null>(null)
     const [filter, setFilter] = useState<'all' | 'strong' | 'moderate' | 'low'>('all')
     const [suggestedQueries, setSuggestedQueries] = useState<string[]>(DEFAULT_QUERIES)
 
@@ -347,7 +316,6 @@ export default function JobsPage() {
             const parsed = JSON.parse(stored)
             setFileId(parsed.fileId)
 
-            // Build dynamic suggestions from cached feed roles
             const buildSuggestions = (roles: { title: string }[]) => {
                 return roles.flatMap(r => [
                     `${r.title} remote`,
@@ -355,7 +323,6 @@ export default function JobsPage() {
                 ]).slice(0, 6)
             }
 
-            // Try cache first — no API call needed
             const cacheKey = `jobFeed_${parsed.fileId}`
             const cached = localStorage.getItem(cacheKey)
             if (cached) {
@@ -363,26 +330,21 @@ export default function JobsPage() {
                     const roles = JSON.parse(cached)
                     if (Array.isArray(roles) && roles.length > 0) {
                         setSuggestedQueries(buildSuggestions(roles))
-                    
+                        return
                     }
                 } catch {}
             }
 
-            // Cache miss — fetch feed and update suggestions
             fetch(`${getBackendUrl()}/api/jobs/feed?file_id=${encodeURIComponent(parsed.fileId)}`)
                 .then(res => res.ok ? res.json() : null)
                 .then(roles => {
                     if (Array.isArray(roles) && roles.length > 0) {
-                        // Store in cache for next time
                         localStorage.setItem(cacheKey, JSON.stringify(roles))
                         setSuggestedQueries(buildSuggestions(roles))
                     }
                 })
-                .catch(() => {}) // silently keep defaults on error
+                .catch(() => {})
         } catch {}
-
-        // TODO: replace with real Supabase auth user id
-        setUserId('test-user-123')
     }, [])
 
     async function handleSearch(overrideQuery?: string) {
@@ -429,7 +391,6 @@ export default function JobsPage() {
         <AppShell>
             <div className="max-w-3xl mx-auto space-y-5">
 
-                {/* Header */}
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-lg bg-[#2a2b2b] border border-[#3a3b3b] flex items-center justify-center">
                         <Briefcase className="w-4 h-4 text-gray-300" />
@@ -442,7 +403,6 @@ export default function JobsPage() {
                     </div>
                 </div>
 
-                {/* No CV warning */}
                 {!fileId && (
                     <div className="flex items-start gap-3 rounded-xl border border-yellow-900/40 bg-yellow-950/20 px-4 py-3 text-sm text-yellow-400">
                         <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -456,7 +416,6 @@ export default function JobsPage() {
                     </div>
                 )}
 
-                {/* Search bar */}
                 <div className="relative">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 pointer-events-none" />
                     <input
@@ -481,11 +440,8 @@ export default function JobsPage() {
                     </button>
                 </div>
 
-                {/* Dynamic suggested queries */}
                 <div className="space-y-2">
-                    <p className="text-[10px] tracking-widest text-gray-600 uppercase">
-                        Quick searches
-                    </p>
+                    <p className="text-[10px] tracking-widest text-gray-600 uppercase">Quick searches</p>
                     <div className="flex flex-wrap gap-2">
                         {suggestedQueries.map((q) => (
                             <button
@@ -499,7 +455,6 @@ export default function JobsPage() {
                     </div>
                 </div>
 
-                {/* Error */}
                 {error && (
                     <div className="flex items-start gap-3 rounded-xl border border-red-900/40 bg-red-950/20 px-4 py-3 text-sm text-red-400">
                         <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -510,17 +465,13 @@ export default function JobsPage() {
                     </div>
                 )}
 
-                {/* Loading skeleton */}
                 {loading && (
                     <div className="space-y-3">
                         <p className="text-xs text-gray-600 animate-pulse">
                             Searching live jobs and scoring against your CV…
                         </p>
                         {[1, 2, 3].map((i) => (
-                            <div
-                                key={i}
-                                className="rounded-xl border border-[#3a3b3b] bg-[#1f2020] p-5 animate-pulse space-y-3"
-                            >
+                            <div key={i} className="rounded-xl border border-[#3a3b3b] bg-[#1f2020] p-5 animate-pulse space-y-3">
                                 <div className="flex gap-4">
                                     <div className="flex-1 space-y-2 pt-1">
                                         <div className="h-3.5 bg-[#2a2b2b] rounded w-2/3" />
@@ -539,21 +490,15 @@ export default function JobsPage() {
                     </div>
                 )}
 
-                {/* Results */}
                 {!loading && searched && jobs.length > 0 && (
                     <div className="space-y-4">
                         <div className="flex items-center justify-between flex-wrap gap-3">
-                            <ScoreFilterBar
-                                filter={filter}
-                                setFilter={setFilter}
-                                total={jobs.length}
-                            />
+                            <ScoreFilterBar filter={filter} setFilter={setFilter} total={jobs.length} />
                             <div className="flex items-center gap-1 text-xs text-gray-600">
                                 <SlidersHorizontal className="w-3 h-3" />
                                 Sorted by fit score
                             </div>
                         </div>
-
                         {filteredJobs.length === 0 ? (
                             <div className="text-center py-10 text-sm text-gray-500">
                                 No jobs in this category. Try a different filter.
@@ -566,16 +511,13 @@ export default function JobsPage() {
                     </div>
                 )}
 
-                {/* Empty state */}
                 {!loading && searched && jobs.length === 0 && !error && (
                     <div className="text-center py-16 space-y-3">
                         <div className="w-12 h-12 rounded-full bg-[#2a2b2b] border border-[#3a3b3b] flex items-center justify-center mx-auto">
                             <Briefcase className="w-5 h-5 text-gray-600" />
                         </div>
                         <p className="text-gray-400 text-sm">No jobs found for this query.</p>
-                        <p className="text-gray-600 text-xs">
-                            Try a broader search — e.g. "developer Bangladesh"
-                        </p>
+                        <p className="text-gray-600 text-xs">Try a broader search — e.g. "developer Bangladesh"</p>
                     </div>
                 )}
             </div>

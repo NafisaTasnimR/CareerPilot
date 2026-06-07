@@ -5,10 +5,9 @@ import AppShell from '@/components/app-shell'
 import KanbanBoard from '@/components/tracker/kanban-board'
 import CalendarTodo from '@/components/tracker/calendar-todo'
 import ProgressDashboard from '@/components/tracker/progress-dashboard'
-
-
 import NudgeWidget from '@/components/tracker/nudge-widget'
 import { getBackendUrl } from '@/lib/backend'
+import { useAuth } from '@/components/authentication/auth-provider'
 
 const TABS = [
   { id: 'kanban', label: 'Applications' },
@@ -18,12 +17,13 @@ const TABS = [
 
 export default function TrackerPage() {
   const [activeTab, setActiveTab] = useState('kanban')
-  const api = getBackendUrl()
+  const { user } = useAuth()
+  const api = `${getBackendUrl()}/api`
+  const userId = user?.uid || ''
 
   return (
     <AppShell>
       <div className="p-6 max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">
             Track Progress
@@ -33,7 +33,6 @@ export default function TrackerPage() {
           </p>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-2 mb-8 border-b border-gray-800">
           {TABS.map(tab => (
             <button
@@ -49,25 +48,20 @@ export default function TrackerPage() {
           ))}
         </div>
 
-        {/* Main Content */}
         {activeTab === 'kanban' && (
-          <KanbanBoard userId={USER_ID} api={API!} />
+          <KanbanBoard userId={userId} api={api} />
         )}
 
         {activeTab === 'calendar' && (
-          <CalendarTodo />
+          <CalendarTodo userId={userId} api={api} />
         )}
 
         {activeTab === 'progress' && (
-          <ProgressDashboard userId={USER_ID} api={API!} />
+          <ProgressDashboard userId={userId} api={api} />
         )}
       </div>
 
-      {/* Floating AI Nudge Assistant */}
-      <NudgeWidget
-        userId={USER_ID}
-        api={API!}
-      />
+      <NudgeWidget userId={userId} api={`${getBackendUrl()}/api`} />
     </AppShell>
   )
 }

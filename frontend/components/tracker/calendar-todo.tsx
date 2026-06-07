@@ -175,8 +175,14 @@ useEffect(() => {
   }
 
   const toggleGoal = async (id: string, completed: boolean) => {
-    try { const h = await getAuthHeaders(); await fetch(`${baseApi}/calendar/goals/${id}?completed=${!completed}`, { method: 'PATCH', headers: h }) } catch {}
-    setGoals(p => p.map(g => g.id === id ? { ...g, completed: !completed } : g))
+    const nowCompleted = !completed
+    try { const h = await getAuthHeaders(); await fetch(`${baseApi}/calendar/goals/${id}?completed=${nowCompleted}`, { method: 'PATCH', headers: h }) } catch {}
+    setGoals(p => p.map(g => g.id === id ? { ...g, completed: nowCompleted } : g))
+    // Cascade: marking a goal done auto-completes all its tasks in the UI too.
+    // Un-marking leaves tasks unchanged (matches backend behaviour).
+    if (nowCompleted) {
+      setTasks(p => p.map(t => t.goal_id === id ? { ...t, completed: true } : t))
+    }
   }
 
   const toggleTask = async (id: string, completed: boolean) => {

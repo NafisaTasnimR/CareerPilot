@@ -51,11 +51,18 @@ def create_goal(goal: GoalCreate, current_user = Depends(get_current_user)):
 
 @router.patch("/goals/{goal_id}")
 def complete_goal(goal_id: str, completed: bool, current_user = Depends(get_current_user)):
+    uid = current_user["firebase_uid"]
     # Verify ownership
-    res = supabase.table("goals").select("*").eq("id", goal_id).eq("user_id", current_user["firebase_uid"]).execute()
+    res = supabase.table("goals").select("*").eq("id", goal_id).eq("user_id", uid).execute()
     if not res.data:
         raise HTTPException(403, "Goal not found or unauthorized")
-    return supabase.table("goals").update({"completed": completed}).eq("id", goal_id).execute().data[0]
+    # Update the goal
+    updated_goal = supabase.table("goals").update({"completed": completed}).eq("id", goal_id).execute().data[0]
+    # Cascade: marking goal done auto-completes all its tasks.
+    # Un-marking leaves tasks as-is (user may have intentionally completed some).
+    if completed:
+        supabase.table("tasks").update({"completed": True}).eq("goal_id", goal_id).eq("user_id", uid).execute()
+    return updated_goal
 
 @router.get("/tasks")
 def get_tasks(current_user = Depends(get_current_user)):

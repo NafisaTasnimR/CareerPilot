@@ -14,7 +14,7 @@ const RULE    = '#2e2e2e'    // was #2a — a touch more visible
 const STATUS_META = [
   { key: 'Applied',      color: '#6eb5f5' },  // vivid blue
   { key: 'Interviewing',  color: '#d4a853' },  // gold
-  { key: 'Offered',       color: '#4dd6a0' },  // vivid teal
+  { key: 'Offer',         color: '#4dd6a0' },  // vivid teal
   { key: 'Rejected',     color: '#e07575' },  // vivid red
 ]
 
@@ -59,10 +59,15 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
 
   useEffect(() => {
     if (!stats) return
-    const taskPct = stats.tasks_total > 0 ? (stats.tasks_completed / stats.tasks_total) * 100 : 0
-    const goalPct = stats.goals_total > 0 ? (stats.goals_completed / stats.goals_total) * 100 : 0
-    const appPct  = Math.min((stats.total_applications ?? 0) / 20, 1) * 100
-    targetRef.current = Math.round(taskPct * 0.5 + goalPct * 0.3 + appPct * 0.2) / 100
+    const bd = stats.status_breakdown || {}
+    const _app = bd['Applied'] ?? 0; const _int = bd['Interviewing'] ?? 0
+    const _off = bd['Offer'] ?? 0;   const _rej = bd['Rejected'] ?? 0
+    const _score = _app * 1 + _int * 2 + _off * 4
+    const _ceil  = Math.max(_app + _int + _off + _rej, 1) * 2
+    const _pipePct = Math.min(_score / _ceil, 1) * 100
+    const _goalPct = stats.goals_total > 0 ? (stats.goals_completed / stats.goals_total) * 100 : 0
+    const _taskPct = stats.tasks_total  > 0 ? (stats.tasks_completed  / stats.tasks_total)  * 100 : 0
+    targetRef.current = Math.round(_pipePct * 0.60 + _goalPct * 0.25 + _taskPct * 0.15) / 100
     if (canvasRef.current && !loopStarted.current) {
       const canvas = canvasRef.current
       canvas.width  = canvas.clientWidth * window.devicePixelRatio
@@ -252,19 +257,33 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
   )
 
   // ── Computed values
-  const taskPct = stats.tasks_total > 0 ? (stats.tasks_completed/stats.tasks_total)*100 : 0
-  const goalPct = stats.goals_total > 0 ? (stats.goals_completed/stats.goals_total)*100 : 0
-  const appPct  = Math.min((stats.total_applications??0)/20,1)*100
-  const pct     = Math.round(taskPct*.5 + goalPct*.3 + appPct*.2)
-
   const breakdown = stats.status_breakdown || {}
+
+  // Pipeline-based progress: weight each stage by career advancement value
+  // Applied=1pt, Interviewing=2pts, Offer=4pts, Rejected=0pts
+  // Score is capped at a realistic ceiling so it actually reaches 100%
+  const applied      = breakdown['Applied']      ?? 0
+  const interviewing = breakdown['Interviewing'] ?? 0
+  const offered      = breakdown['Offer']        ?? 0
+  const rejected     = breakdown['Rejected']     ?? 0
+  const pipelineScore  = applied * 1 + interviewing * 2 + offered * 4
+  // Ceiling = if every app reached interview stage (realistic best-case)
+  const total_apps_for_ceil = Math.max(applied + interviewing + offered + rejected, 1)
+  const pipelineCeil = total_apps_for_ceil * 2   // avg weight = 2 (interview stage)
+  const pipelinePct  = Math.min(pipelineScore / pipelineCeil, 1) * 100
+
+  const goalPct = stats.goals_total > 0 ? (stats.goals_completed / stats.goals_total) * 100 : 0
+  const taskPct = stats.tasks_total  > 0 ? (stats.tasks_completed  / stats.tasks_total)  * 100 : 0
+
+  // Final score: pipeline is the primary signal (60%), goals (25%), tasks (15%)
+  const pct = Math.round(pipelinePct * 0.60 + goalPct * 0.25 + taskPct * 0.15)
 
   // Always derive total from actual breakdown counts so per-status %
   // is never wrong when total_applications is 0 or mismatched.
   const breakdownSum =
     (breakdown['Applied']      ?? 0) +
     (breakdown['Interviewing'] ?? 0) +
-    (breakdown['Offered']      ?? 0) +
+    (breakdown['Offer']        ?? 0) +
     (breakdown['Rejected']     ?? 0)
   // Fall back to total_applications if breakdown is empty
   const total = Math.max(breakdownSum || stats.total_applications || 1, 1)
@@ -282,9 +301,9 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
   const maxCount = Math.max(...rows.map(r => r.count), 1)
 
   const responseRate = parseFloat((
-    ((breakdown['Interviewing']??0) + (breakdown['Offered']??0) + (breakdown['Rejected']??0)) / total * 100
+    ((breakdown['Interviewing']??0) + (breakdown['Offer']??0) + (breakdown['Rejected']??0)) / total * 100
   ).toFixed(1))
-  const offerRate = parseFloat(((breakdown['Offered']??0) / total * 100).toFixed(1))
+  const offerRate = parseFloat(((breakdown['Offer']??0) / total * 100).toFixed(1))
 
   const metricCards = [
     { label: 'Total',         value: String(total),                          color: TEXT },

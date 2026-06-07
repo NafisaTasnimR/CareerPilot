@@ -61,7 +61,7 @@ export default function TrackerPage() {
         )}
       </div>
 
-      <NudgeWidget userId={userId} api={`${getBackendUrl()}/api`} />
+      <NudgeWidget api={`${getBackendUrl()}/api`} />
     </AppShell>
   )
 }

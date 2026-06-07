@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { auth } from '@/lib/firebase'
 
 interface Nudge {
   id: string
@@ -12,9 +13,25 @@ interface Nudge {
 }
 
 interface NudgeHistoryProps {
-  userId: string
-  api: string
+  api?: string
 }
+
+// ── auth helper ───────────────────────────────────────────────────────────────
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  return new Promise((resolve) => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      unsubscribe()
+      const token = await user?.getIdToken()
+      resolve({
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      })
+    })
+  })
+}
+
+// ── event meta ────────────────────────────────────────────────────────────────
 
 const EVENT_META: Record<string, { label: string; emoji: string }> = {
   deadline_today:      { label: 'Due Today',      emoji: '🔥' },
@@ -35,17 +52,41 @@ function formatDate(iso: string) {
   })
 }
 
-export default function NudgeHistory({ userId, api }: NudgeHistoryProps) {
+// ── component ─────────────────────────────────────────────────────────────────
+
+export default function NudgeHistory({ api = 'http://localhost:8000' }: NudgeHistoryProps) {
   const [nudges, setNudges]   = useState<Nudge[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`${api}/nudges/?user_id=${userId}&limit=10`)
-      .then(r => r.json())
-      .then((data: Nudge[]) => setNudges(data))
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [api, userId])
+    let cancelled = false
+
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        setLoading(false)
+        return
+      }
+
+      try {
+        const headers = await getAuthHeaders()
+        const res = await fetch(`${api}/nudges/?limit=10`, { headers })
+        if (!res.ok) throw new Error('Failed to load nudges')
+        const data: Nudge[] = await res.json()
+        if (!cancelled) setNudges(data)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+
+      unsubscribe() // only need one fetch
+    })
+
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [api])
 
   if (loading) {
     return (
@@ -66,7 +107,9 @@ export default function NudgeHistory({ userId, api }: NudgeHistoryProps) {
       ) : (
         <div className="flex flex-col gap-3">
           {nudges.map(n => {
-            const meta = n.event_type ? (EVENT_META[n.event_type] ?? { label: 'Nudge', emoji: '💡' }) : { label: 'Nudge', emoji: '💡' }
+            const meta = n.event_type
+              ? (EVENT_META[n.event_type] ?? { label: 'Nudge', emoji: '💡' })
+              : { label: 'Nudge', emoji: '💡' }
             return (
               <div
                 key={n.id}

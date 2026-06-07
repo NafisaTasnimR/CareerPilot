@@ -1,24 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import AppShell from '@/components/app-shell'
 import KanbanBoard from '@/components/tracker/kanban-board'
 import CalendarTodo from '@/components/tracker/calendar-todo'
 import ProgressDashboard from '@/components/tracker/progress-dashboard'
 import NudgePanel from '@/components/tracker/nudge-panel'
+import { getBackendUrl } from '@/lib/backend'
 
 const TABS = [
-  { id: 'kanban', label: 'Applications'},
+  { id: 'kanban', label: 'Applications' },
   { id: 'calendar', label: 'Calendar & Goals' },
   { id: 'progress', label: 'Progress' },
   { id: 'nudges', label: 'AI Nudges' },
 ]
 
-const USER_ID = 'test-user'
-const API = process.env.NEXT_PUBLIC_API_URL
-
 export default function TrackerPage() {
   const [activeTab, setActiveTab] = useState('kanban')
+  const api = getBackendUrl()
 
   return (
     <AppShell>
@@ -35,22 +34,21 @@ export default function TrackerPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-3 text-sm font-medium transition-all border-b-2 -mb-px ${
-                activeTab === tab.id
+              className={`px-4 py-3 text-sm font-medium transition-all border-b-2 -mb-px ${activeTab === tab.id
                   ? 'border-white text-white'
                   : 'border-transparent text-gray-400 hover:text-gray-200'
-              }`}
+                }`}
             >
-               {tab.label}
+              {tab.label}
             </button>
           ))}
         </div>
 
         {/* Tab content */}
-        {activeTab === 'kanban' && <KanbanBoard userId={USER_ID} api={API!} />}
-        {activeTab === 'calendar' && <CalendarTodo userId={USER_ID} api={API!} />}
-        {activeTab === 'progress' && <ProgressDashboard userId={USER_ID} api={API!} />}
-        {activeTab === 'nudges' && <NudgePanel userId={USER_ID} api={API!} />}
+        {activeTab === 'kanban' && <KanbanBoard api={api} />}
+        {activeTab === 'calendar' && <CalendarTodo api={api} />}
+        {activeTab === 'progress' && <ProgressDashboard api={api} />}
+        {activeTab === 'nudges' && <NudgePanel api={api} />}
       </div>
     </AppShell>
   )

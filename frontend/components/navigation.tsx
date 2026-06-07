@@ -17,6 +17,7 @@ import {
     ChevronRight,
 } from 'lucide-react'
 import { useState } from 'react'
+import { useAuth } from './authentication/auth-provider'
 
 const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -35,9 +36,15 @@ interface NavigationProps {
 export default function Navigation({ collapsed, onToggle }: NavigationProps) {
     const pathname = usePathname()
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+    const { user, logout } = useAuth()
     const showLabels = !collapsed || mobileMenuOpen
 
     const isActive = (href: string) => pathname === href
+
+    const handleLogout = async () => {
+        await logout()
+        setMobileMenuOpen(false)
+    }
 
     return (
         <>
@@ -119,7 +126,7 @@ export default function Navigation({ collapsed, onToggle }: NavigationProps) {
                 </nav>
 
                 <div className="mt-10 pt-6 border-t border-gray-800">
-                    <button className={`flex items-center ${showLabels ? 'gap-3 px-3' : 'justify-center px-2'} rounded-lg py-2 text-sm font-medium text-white hover:bg-[#2d2e2e] w-full transition-colors`}>
+                    <button onClick={handleLogout} className={`flex items-center ${showLabels ? 'gap-3 px-3' : 'justify-center px-2'} rounded-lg py-2 text-sm font-medium text-white hover:bg-[#2d2e2e] w-full transition-colors`}>
                         <LogOut className="h-4 w-4" />
                         {showLabels && 'Log out'}
                     </button>
@@ -127,11 +134,11 @@ export default function Navigation({ collapsed, onToggle }: NavigationProps) {
 
                 <div className={`mt-auto pt-8 flex items-center text-white text-sm ${showLabels ? 'gap-3' : 'justify-center'}`}>
                     <span className="h-9 w-9 rounded-full bg-[#111827] border border-gray-800 flex items-center justify-center text-xs text-white">
-                        AR
+                        {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
                     </span>
                     {showLabels && (
                         <div>
-                            <div className="text-white text-sm font-medium">Ari Rahman</div>
+                            <div className="text-white text-sm font-medium">{user?.displayName || user?.email || 'User'}</div>
                             <div className="text-xs text-white">Free plan</div>
                         </div>
                     )}

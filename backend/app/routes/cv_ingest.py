@@ -1,10 +1,15 @@
 import os
 from uuid import uuid4
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
+import firebase_admin
+from firebase_admin import auth as firebase_auth
 
 from app.core.config import get_settings
 from app.db import supabase
+from app.models import User as UserModel
 from app.schemas.cv import CVChunkItem, CVEmbeddedDataResponse, CVEmbeddedSection, CVIngestResponse, CVUploadResponse
 from app.services.cv_chunker import chunk_sections_from_sections, extract_section_segments, infer_section_from_text, normalize_section_name
 from app.services.cv_parser import parse_file
@@ -14,10 +19,28 @@ from app.services.vector_store import add_embeddings, get_embeddings_by_source
 from app.utils.files import save_bytes_to_temp, save_upload_to_temp
 
 router = APIRouter(prefix="/cv", tags=["cv"])
+security = HTTPBearer()
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    token = credentials.credentials
+    try:
+        decoded_token = firebase_auth.verify_id_token(token, clock_skew_seconds=60)
+        uid = decoded_token['uid']
+        
+        result = supabase.table("users").select("*").eq("firebase_uid", uid).single().execute()
+        if not result.data:
+            raise HTTPException(status_code=401, detail="User not found")
+        return result.data
+    except firebase_admin.exceptions.FirebaseError as e:
+        raise HTTPException(status_code=401, detail=f"Firebase error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Token verification failed: {str(e)}")
 
 
 @router.post("/upload", response_model=CVUploadResponse)
-async def upload_cv(file: UploadFile = File(...)):
+async def upload_cv(file: UploadFile = File(...), current_user = Depends(get_current_user)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="File name is required")
 
@@ -54,6 +77,7 @@ async def ingest_cv(
     file: UploadFile | None = File(None),
     file_id: str | None = None,
     candidate_id: str | None = None,
+    current_user = Depends(get_current_user),
 ):
     if not file and not file_id:
         raise HTTPException(status_code=400, detail="File or file_id is required")

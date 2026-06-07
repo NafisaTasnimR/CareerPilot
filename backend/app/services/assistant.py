@@ -16,7 +16,9 @@ _STRUCTURED_SECTIONS = ("experience", "skills", "education")
 
 STYLE_GUIDANCE = (
     "Tone: friendly, warm, and concise. "
-    "If the user greets, makes small talk, or asks unrelated questions, "
+    "Avoid repetitive greetings like 'Hello' or 'Hi' in every response; "
+    "treat this as an ongoing conversation. "
+    "If the user greets for the first time, or makes small talk, or asks unrelated questions, "
     "reply with a short friendly greeting and a reminder that you can only help "
     "with CV, job search, and career topics, then invite a relevant question.\n"
 )

@@ -1,188 +1,147 @@
 'use client'
 
 import AppShell from '@/components/app-shell'
-import { User, Bell, Lock, LogOut, AlertCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useAuth } from '@/components/authentication/auth-provider'
+import { User } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { updateProfile } from 'firebase/auth'
 
 export default function SettingsPage() {
-    const [activeTab, setActiveTab] = useState('profile')
+    const { user } = useAuth()
+    const [loading, setLoading] = useState(false)
+    const [message, setMessage] = useState('')
     const [formData, setFormData] = useState({
-        name: 'John Doe',
-        email: 'john@example.com',
-        phone: '+1 (555) 000-0000',
-        location: 'San Francisco, CA',
+        displayName: '',
+        email: '',
+        photoURL: '',
     })
 
-    const tabs = [
-        { id: 'profile', label: 'Profile', icon: User },
-        { id: 'notifications', label: 'Notifications', icon: Bell },
-        { id: 'security', label: 'Security', icon: Lock },
-    ]
+    useEffect(() => {
+        if (user) {
+            setFormData({
+                displayName: user.displayName || '',
+                email: user.email || '',
+                photoURL: user.photoURL || '',
+            })
+        }
+    }, [user])
+
+    const handleUpdateProfile = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!user) return
+
+        setLoading(true)
+        setMessage('')
+        try {
+            await updateProfile(user, {
+                displayName: formData.displayName,
+                photoURL: formData.photoURL,
+            })
+
+            // Sync user data to backend
+            const idToken = await user.getIdToken()
+            const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}/api/users/me`, {
+                method: 'OPTIONS',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({
+                    firebase_uid: user.uid,
+                    email: user.email,
+                    full_name: formData.displayName,
+                }),
+            })
+
+            if (response.ok) {
+                setMessage('Profile updated successfully!')
+            } else {
+                setMessage('Profile updated in Firebase, but sync with backend failed.')
+            }
+        } catch (error: any) {
+            setMessage(`Error: ${error.message}`)
+        } finally {
+            setLoading(false)
+        }
+    }
 
     return (
         <AppShell>
             <div className="max-w-4xl mx-auto space-y-8">
                 <div>
                     <h1 className="text-3xl sm:text-4xl font-semibold text-white">Settings</h1>
-                    <p className="text-gray-400 mt-2">Manage your account and preferences</p>
+                    <p className="text-gray-400 mt-2">Manage your account</p>
                 </div>
 
-                <div className="flex gap-2 border-b border-gray-800">
-                    {tabs.map((tab) => {
-                        const Icon = tab.icon
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id
-                                    ? 'border-gray-200 text-gray-100'
-                                    : 'border-transparent text-gray-400 hover:text-white'
-                                    }`}
-                            >
-                                <Icon className="w-4 h-4" />
-                                {tab.label}
-                            </button>
-                        )
-                    })}
-                </div>
-
-                {activeTab === 'profile' && (
-                    <div className="space-y-6">
-                        <div className="rounded-xl border border-slate-700 bg-[#0f172a] p-6">
-                            <h2 className="text-lg font-semibold text-white mb-6">
-                                Profile Information
-                            </h2>
-
-                            <div className="space-y-4">
-                                {[
-                                    { label: 'Full Name', value: 'name' },
-                                    { label: 'Email', value: 'email' },
-                                    { label: 'Phone', value: 'phone' },
-                                    { label: 'Location', value: 'location' },
-                                ].map((field) => (
-                                    <div key={field.value}>
-                                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                                            {field.label}
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData[field.value as keyof typeof formData]}
-                                            onChange={(e) =>
-                                                setFormData({
-                                                    ...formData,
-                                                    [field.value]: e.target.value,
-                                                })
-                                            }
-                                            className="w-full px-4 py-2 rounded-lg border border-slate-700 bg-[#111827] text-white focus:outline-none focus:border-cyan-400/60 transition-colors"
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-
-                            <button className="mt-6 px-6 py-2 rounded-lg bg-[#111827] border border-slate-700 text-white font-medium transition-colors hover:border-cyan-400/60">
-                                Save Changes
-                            </button>
-                        </div>
+                {message && (
+                    <div className={`p-4 rounded-lg ${message.includes('Error') ? 'bg-red-900/30 text-red-200' : 'bg-green-900/30 text-green-200'}`}>
+                        {message}
                     </div>
                 )}
 
-                {activeTab === 'notifications' && (
-                    <div className="space-y-6">
-                        <div className="rounded-xl border border-slate-700 bg-[#0f172a] p-6">
-                            <h2 className="text-lg font-semibold text-white mb-6">
-                                Notification Preferences
-                            </h2>
+                <form onSubmit={handleUpdateProfile} className="space-y-6">
+                    <div className="rounded-xl border border-gray-700 bg-gray-900 p-6">
+                        <h2 className="text-lg font-semibold text-white mb-6">Profile Information</h2>
 
-                            <div className="space-y-4">
-                                {[
-                                    {
-                                        title: 'Job Recommendations',
-                                        description: 'Get notified about new job matches',
-                                        enabled: true,
-                                    },
-                                    {
-                                        title: 'Application Updates',
-                                        description: 'Receive updates on your applications',
-                                        enabled: true,
-                                    },
-                                    {
-                                        title: 'Learning Resources',
-                                        description:
-                                            'Get suggestions for courses and learning materials',
-                                        enabled: false,
-                                    },
-                                    {
-                                        title: 'Weekly Summary',
-                                        description: 'Receive a weekly summary of your progress',
-                                        enabled: true,
-                                    },
-                                ].map((item, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="flex items-center justify-between p-4 rounded-lg bg-[#111827] border border-slate-700"
-                                    >
-                                        <div>
-                                            <p className="text-white font-medium">{item.title}</p>
-                                            <p className="text-gray-400 text-sm">{item.description}</p>
-                                        </div>
-                                        <input
-                                            type="checkbox"
-                                            defaultChecked={item.enabled}
-                                            className="w-5 h-5 rounded border-gray-600 text-gray-200 focus:ring-gray-500 cursor-pointer"
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'security' && (
-                    <div className="space-y-6">
-                        <div className="rounded-xl border border-slate-700 bg-[#0f172a] p-6">
-                            <h2 className="text-lg font-semibold text-white mb-6">
-                                Change Password
-                            </h2>
-
-                            <div className="space-y-4">
-                                {[
-                                    { label: 'Current Password', type: 'password' },
-                                    { label: 'New Password', type: 'password' },
-                                    { label: 'Confirm Password', type: 'password' },
-                                ].map((field) => (
-                                    <div key={field.label}>
-                                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                                            {field.label}
-                                        </label>
-                                        <input
-                                            type={field.type}
-                                            className="w-full px-4 py-2 rounded-lg border border-slate-700 bg-[#111827] text-white focus:outline-none focus:border-cyan-400/60 transition-colors"
-                                            placeholder="password"
-                                        />
-                                    </div>
-                                ))}
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    Full Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.displayName}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            displayName: e.target.value,
+                                        })
+                                    }
+                                    className="w-full px-4 py-2 rounded-lg border border-gray-700 bg-gray-800 text-white focus:outline-none focus:border-gray-500 transition-colors"
+                                />
                             </div>
 
-                            <button className="mt-6 px-6 py-2 rounded-lg bg-[#111827] border border-slate-700 text-white font-medium transition-colors hover:border-cyan-400/60">
-                                Update Password
-                            </button>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    Email
+                                </label>
+                                <input
+                                    type="email"
+                                    value={formData.email}
+                                    disabled
+                                    className="w-full px-4 py-2 rounded-lg border border-gray-700 bg-gray-800 text-gray-400 cursor-not-allowed"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    Profile Picture URL
+                                </label>
+                                <input
+                                    type="url"
+                                    value={formData.photoURL}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            photoURL: e.target.value,
+                                        })
+                                    }
+                                    placeholder="https://..."
+                                    className="w-full px-4 py-2 rounded-lg border border-gray-700 bg-gray-800 text-white focus:outline-none focus:border-gray-500 transition-colors"
+                                />
+                            </div>
                         </div>
 
-                        <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-6">
-                            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                                <AlertCircle className="w-5 h-5 text-red-400" />
-                                Danger Zone
-                            </h3>
-                            <p className="text-gray-400 mb-4">
-                                Delete your account and all associated data. This action cannot be
-                                undone.
-                            </p>
-                            <button className="px-6 py-2 rounded-lg border border-red-500 text-red-300 hover:bg-red-500/10 font-medium transition-colors">
-                                Delete Account
-                            </button>
-                        </div>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="mt-6 px-6 py-2 rounded-lg bg-gray-700 text-white font-medium transition-colors hover:bg-gray-600 disabled:opacity-50"
+                        >
+                            {loading ? 'Saving...' : 'Save Changes'}
+                        </button>
                     </div>
-                )}
+                </form>
             </div>
         </AppShell>
     )

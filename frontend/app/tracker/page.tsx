@@ -8,6 +8,7 @@ import ProgressDashboard from '@/components/tracker/progress-dashboard'
 
 
 import NudgeWidget from '@/components/tracker/nudge-widget'
+import { getBackendUrl } from '@/lib/backend'
 
 const TABS = [
   { id: 'kanban', label: 'Applications' },
@@ -15,11 +16,9 @@ const TABS = [
   { id: 'progress', label: 'Progress' },
 ]
 
-const USER_ID = 'test-user-123'
-const API = process.env.NEXT_PUBLIC_API_URL
-
 export default function TrackerPage() {
   const [activeTab, setActiveTab] = useState('kanban')
+  const api = getBackendUrl()
 
   return (
     <AppShell>
@@ -40,11 +39,10 @@ export default function TrackerPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-3 text-sm font-medium transition-all border-b-2 -mb-px ${
-                activeTab === tab.id
-                  ? 'border-white text-white'
-                  : 'border-transparent text-gray-400 hover:text-gray-200'
-              }`}
+              className={`px-4 py-3 text-sm font-medium transition-all border-b-2 -mb-px ${activeTab === tab.id
+                ? 'border-white text-white'
+                : 'border-transparent text-gray-400 hover:text-gray-200'
+                }`}
             >
               {tab.label}
             </button>

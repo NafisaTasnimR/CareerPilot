@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import AppShell from '@/components/app-shell'
 import { Send, Plus, Copy, Check } from 'lucide-react'
-import { getBackendUrl } from '@/lib/backend'
+import { getBackendUrl, getAuthHeaders } from '@/lib/backend'
 
 type AssistantMessage = {
     role: 'user' | 'assistant'
@@ -14,8 +14,7 @@ type StoredCV = {
     fileId?: string
 }
 
-// ─── Minimal markdown renderer ───────────────────────────────────────────────
-// Handles: **bold**, `inline code`, ```code blocks```, bullet lists, headings
+// ─── Minimal markdown renderer (unchanged) ───────────────────────────────────
 function MarkdownContent({ content }: { content: string }) {
     const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
 
@@ -31,10 +30,8 @@ function MarkdownContent({ content }: { content: string }) {
         }
     }
 
-    // Split on fenced code blocks first
     const fenceRegex = /```([a-z]*)\n?([\s\S]*?)```/g
     const parts: Array<{ type: 'text' | 'code'; lang?: string; content: string }> = []
-
     let last = 0
     let match: RegExpExecArray | null
     let codeIdx = 0
@@ -57,7 +54,6 @@ function MarkdownContent({ content }: { content: string }) {
                     const idx = codeIdx++
                     return (
                         <div key={pi} className="relative rounded-xl overflow-hidden border border-white/10">
-                            {/* Header bar */}
                             <div className="flex items-center justify-between bg-white/5 px-4 py-2 text-xs text-gray-400">
                                 <span className="font-mono uppercase tracking-wider">{part.lang}</span>
                                 <button
@@ -78,13 +74,11 @@ function MarkdownContent({ content }: { content: string }) {
                     )
                 }
 
-                // Render prose: group consecutive table lines, then render line by line
                 return (
                     <div key={pi} className="space-y-2">
                         {groupLines(part.content.split('\n')).map((group, gi) => {
-                            // ── Table group ──
                             if (group.type === 'table') {
-                                const [headerRow, , ...bodyRows] = group.lines  // skip separator row
+                                const [headerRow, , ...bodyRows] = group.lines
                                 const headers = parseTableRow(headerRow)
                                 return (
                                     <div key={gi} className="overflow-x-auto rounded-xl border border-white/10 my-3">
@@ -92,10 +86,7 @@ function MarkdownContent({ content }: { content: string }) {
                                             <thead>
                                                 <tr className="border-b border-white/10 bg-white/5">
                                                     {headers.map((h, hi) => (
-                                                        <th
-                                                            key={hi}
-                                                            className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400"
-                                                        >
+                                                        <th key={hi} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
                                                             {renderInline(h)}
                                                         </th>
                                                     ))}
@@ -105,15 +96,9 @@ function MarkdownContent({ content }: { content: string }) {
                                                 {bodyRows.map((row, ri) => {
                                                     const cells = parseTableRow(row)
                                                     return (
-                                                        <tr
-                                                            key={ri}
-                                                            className="border-b border-white/6 last:border-0 hover:bg-white/3 transition-colors"
-                                                        >
+                                                        <tr key={ri} className="border-b border-white/6 last:border-0 hover:bg-white/3 transition-colors">
                                                             {cells.map((cell, ci) => (
-                                                                <td
-                                                                    key={ci}
-                                                                    className="px-4 py-3 text-sm leading-6 text-gray-300 align-top"
-                                                                >
+                                                                <td key={ci} className="px-4 py-3 text-sm leading-6 text-gray-300 align-top">
                                                                     {renderInline(cell)}
                                                                 </td>
                                                             ))}
@@ -126,35 +111,22 @@ function MarkdownContent({ content }: { content: string }) {
                                 )
                             }
 
-                            // ── Prose lines ──
                             return group.lines.map((line, li) => {
                                 const key = `${gi}-${li}`
-
-                                // Empty line → spacer
                                 if (!line.trim()) return <div key={key} className="h-1" />
+                                if (/^[-*]{3,}\s*$/.test(line.trim())) return <hr key={key} className="border-white/10 my-2" />
 
-                                // Horizontal rule: --- or ***
-                                if (/^[-*]{3,}\s*$/.test(line.trim())) {
-                                    return <hr key={key} className="border-white/10 my-2" />
-                                }
-
-                                // Heading: #### ### ## #
                                 const headingMatch = line.match(/^(#{1,4})\s+(.+)/)
                                 if (headingMatch) {
                                     const level = headingMatch[1].length
                                     const text = headingMatch[2]
-                                    const cls =
-                                        level === 1
-                                            ? 'text-lg font-semibold text-white mt-2'
-                                            : level === 2
-                                                ? 'text-base font-semibold text-gray-100 mt-1'
-                                                : level === 3
-                                                    ? 'text-sm font-semibold text-gray-200'
-                                                    : 'text-xs font-medium text-gray-300'
+                                    const cls = level === 1 ? 'text-lg font-semibold text-white mt-2'
+                                        : level === 2 ? 'text-base font-semibold text-gray-100 mt-1'
+                                            : level === 3 ? 'text-sm font-semibold text-gray-200'
+                                                : 'text-xs font-medium text-gray-300'
                                     return <p key={key} className={cls}>{renderInline(text)}</p>
                                 }
 
-                                // Bullet list item: - or *
                                 const bulletMatch = line.match(/^[\s]*[-*]\s+(.+)/)
                                 if (bulletMatch) {
                                     return (
@@ -165,7 +137,6 @@ function MarkdownContent({ content }: { content: string }) {
                                     )
                                 }
 
-                                // Numbered list: 1. 2.
                                 const numberedMatch = line.match(/^(\d+)\.\s+(.+)/)
                                 if (numberedMatch) {
                                     return (
@@ -176,7 +147,6 @@ function MarkdownContent({ content }: { content: string }) {
                                     )
                                 }
 
-                                // Normal paragraph line
                                 return (
                                     <p key={key} className="text-sm leading-7 text-gray-200">
                                         {renderInline(line)}
@@ -191,7 +161,6 @@ function MarkdownContent({ content }: { content: string }) {
     )
 }
 
-// Group consecutive lines: table rows get their own group, everything else is prose
 type LineGroup = { type: 'prose' | 'table'; lines: string[] }
 
 function groupLines(lines: string[]): LineGroup[] {
@@ -199,7 +168,6 @@ function groupLines(lines: string[]): LineGroup[] {
     let i = 0
     while (i < lines.length) {
         const line = lines[i]
-        // A table block: current line starts with |, next line is a separator (|---|)
         if (
             line.trim().startsWith('|') &&
             lines[i + 1] &&
@@ -212,7 +180,6 @@ function groupLines(lines: string[]): LineGroup[] {
             }
             groups.push({ type: 'table', lines: tableLines })
         } else {
-            // Prose: collect until we hit a table block
             const proseLines: string[] = []
             while (
                 i < lines.length &&
@@ -231,18 +198,12 @@ function groupLines(lines: string[]): LineGroup[] {
     return groups
 }
 
-// Parse a markdown table row string into cell strings
 function parseTableRow(row: string): string[] {
-    return row
-        .split('|')
-        .slice(1, -1)           // drop leading/trailing empty splits
-        .map((cell) => cell.trim())
+    return row.split('|').slice(1, -1).map((cell) => cell.trim())
 }
 
-// Render inline markdown: **bold**, *italic*, `code`
 function renderInline(text: string): React.ReactNode {
     const parts: React.ReactNode[] = []
-    // Pattern: **bold**, *italic*, `code`
     const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`)/g
     let last = 0
     let match: RegExpExecArray | null
@@ -270,7 +231,7 @@ function renderInline(text: string): React.ReactNode {
     return parts.length === 1 && typeof parts[0] === 'string' ? parts[0] : <>{parts}</>
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
+// ─── Main Page (Updated Layout) ────────────────────────────────────────────
 export default function AssistantPage() {
     const [messages, setMessages] = useState<AssistantMessage[]>([])
     const [query, setQuery] = useState('')
@@ -304,10 +265,18 @@ export default function AssistantPage() {
         setIsSending(true)
 
         try {
+            const authHeaders = await getAuthHeaders()
             const response = await fetch(`${getBackendUrl()}/api/assistant/`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: trimmedQuery, file_id: fileId }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': authHeaders['Authorization'],
+                },
+                body: JSON.stringify({
+                    query: trimmedQuery,
+                    file_id: fileId,
+                    history: messages.map(m => ({ role: m.role, content: m.content }))
+                }),
             })
 
             if (!response.ok) {
@@ -333,34 +302,48 @@ export default function AssistantPage() {
 
     return (
         <AppShell>
-            {/* Full-height flex column: messages scroll, input sticks to bottom */}
-            <div className="flex flex-col h-[calc(100vh-var(--app-shell-header-height,64px))]">
+            <div className="flex flex-col h-[calc(100vh-var(--app-shell-header-height,64px))] bg-[#0f0f0f]">
+                {/* Chat header */}
+                <div className="flex-none border-b border-white/10 bg-[#1a1a1a]/90 backdrop-blur-sm px-6 py-4">
+                    <div className="max-w-5xl mx-auto">
+                        <h1 className="text-xl font-semibold text-white">CareerPilot Assistant</h1>
+                        <p className="text-sm text-gray-400 mt-0.5">
+                            Ask about your CV, job matches, skill gaps, or career planning
+                        </p>
+                    </div>
+                </div>
 
-                {/* ── Scrollable message area ── */}
+                {/* Scrollable message area */}
                 <div className="flex-1 overflow-y-auto">
-                    <div className="mx-auto max-w-3xl px-4 py-8 space-y-8">
-
+                    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
                         {messages.length === 0 && (
-                            <p className="text-sm text-gray-500">
-                                Ask a question about your CV, a job description, or your next career move.
-                            </p>
+                            <div className="text-center py-16">
+                                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/5 mb-4">
+                                    <Send className="w-6 h-6 text-gray-400" />
+                                </div>
+                                <h2 className="text-lg font-medium text-white">Start a conversation</h2>
+                                <p className="text-gray-400 mt-1 max-w-md mx-auto">
+                                    Ask about your resume, job opportunities, or get a personalized career roadmap.
+                                </p>
+                            </div>
                         )}
 
                         {messages.map((message, index) => {
                             if (message.role === 'user') {
                                 return (
                                     <div key={`user-${index}`} className="flex justify-end">
-                                        <div className="max-w-[75%] rounded-2xl bg-[#2a2a2a] px-5 py-3.5 text-sm leading-7 text-gray-100">
+                                        <div className="max-w-[80%] rounded-2xl bg-[#2a2a2a] px-5 py-3.5 text-sm leading-7 text-gray-100 shadow-sm">
                                             {message.content}
                                         </div>
                                     </div>
                                 )
                             }
 
-                            // Assistant: render directly on page background, left-aligned
                             return (
                                 <div key={`assistant-${index}`} className="w-full">
-                                    <MarkdownContent content={message.content} />
+                                    <div className="prose prose-invert max-w-none">
+                                        <MarkdownContent content={message.content} />
+                                    </div>
                                 </div>
                             )
                         })}
@@ -380,18 +363,10 @@ export default function AssistantPage() {
                     </div>
                 </div>
 
-                {/* ── Sticky input bar ── */}
-                <div className="border-t border-white/6 bg-[#1a1a1a]/80 backdrop-blur-sm px-4 py-4">
-                    <div className="mx-auto max-w-3xl space-y-2">
+                {/* Sticky input bar */}
+                <div className="flex-none border-t border-white/10 bg-[#1a1a1a]/90 backdrop-blur-sm px-4 py-4">
+                    <div className="max-w-5xl mx-auto space-y-2">
                         <div className="flex items-center gap-3">
-                            <button
-                                type="button"
-                                aria-label="More"
-                                className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white/6 text-gray-200 hover:bg-white/10 transition-colors"
-                            >
-                                <Plus className="h-4 w-4" />
-                            </button>
-
                             <input
                                 type="text"
                                 value={query}
@@ -402,8 +377,8 @@ export default function AssistantPage() {
                                         void sendMessage()
                                     }
                                 }}
-                                placeholder="Ask anything"
-                                className="flex-1 rounded-full bg-[#232323] px-5 py-3 text-sm text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/10"
+                                placeholder="Ask anything about your career..."
+                                className="flex-1 rounded-full bg-[#232323] px-5 py-3 text-sm text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/15 transition-all"
                             />
 
                             <button
@@ -411,7 +386,7 @@ export default function AssistantPage() {
                                 onClick={() => void sendMessage()}
                                 disabled={isSending || !query.trim()}
                                 aria-label="Send message"
-                                className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#f2f2f2] text-[#1d1d1d] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                                className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white text-black transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 <Send className="h-4 w-4" />
                             </button>

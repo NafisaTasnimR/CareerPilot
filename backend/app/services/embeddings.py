@@ -22,7 +22,7 @@ def embed_texts(texts: list[str], max_batch_size: int = 5) -> list[list[float]]:
         batch = texts[i : i + max_batch_size]
         for text in batch:
             try:
-                embedding = embed_text(text, model="gemini-embedding-001")
+                embedding = embed_text(text, model="gemini-embedding-2")
                 if not embedding:
                     raise RuntimeError("Empty embedding response")
                 embeddings.append(embedding)

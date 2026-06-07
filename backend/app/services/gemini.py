@@ -1,4 +1,5 @@
 from google import genai
+from google.genai import types
 
 from app.core.config import get_settings
 
@@ -21,41 +22,43 @@ def generate_text(prompt: str, model: str) -> str:
         return (getattr(response, "text", "") or "").strip()
     except Exception as e:
         # Log error and return empty string or raise depending on requirements
-        return ""
+        # return ""
+        print(f"generate_text error (model={model}): {str(e)}")  # log the real error
+        raise
 
 def _extract_embedding_values(response: object) -> list[float]:
-    embedding = getattr(response, "embedding", None)
-    if embedding is None and isinstance(response, dict):
-        embedding = response.get("embedding")
-
-    if embedding is None:
+    # The response contains an 'embeddings' list of ContentEmbedding objects
+    embeddings = getattr(response, "embeddings", None)
+    if embeddings is None and isinstance(response, dict):
+        embeddings = response.get("embeddings")
+    if not embeddings:
         return []
+    
+    # Get the first embedding (batch of 1)
+    first_embedding = embeddings[0] if isinstance(embeddings, list) else embeddings
+    
+    # Extract the values attribute
+    if hasattr(first_embedding, "values"):
+        values = first_embedding.values
+    elif isinstance(first_embedding, dict):
+        values = first_embedding.get("values")
+    else:
+        values = first_embedding
+    
+    return values if isinstance(values, list) else []
 
-    values = embedding.get("values") if isinstance(embedding, dict) else getattr(embedding, "values", embedding)
-    if isinstance(values, list):
-        return values
 
-    try:
-        return list(values)
-    except TypeError:
-        return []
-
-
-def embed_text(text: str, model: str) -> list[float]:
+def embed_text(text: str, model: str = "gemini-embedding-2") -> list[float]:
     client = get_client()
     try:
-        # Use text-embedding-004 or gemini-embedding-2 as the current stable versions
-        model_name = "text-embedding-004" if model == "gemini-embedding-001" else model
-        # If the user specifically wants gemini-embedding-2, we can override it here
-        # but usually text-embedding-004 is the latest stable. 
-        # To strictly follow the request:
-        if "gemini-embedding-2" in model or model == "gemini-embedding-001":
-            model_name = "text-embedding-004" 
-            
-        response = client.models.embed_content(model=model_name, contents=text)
+        response = client.models.embed_content(
+            model=model, 
+            contents=text,
+            config=types.EmbedContentConfig(output_dimensionality=768)
+        )
         embedding = _extract_embedding_values(response)
         if not embedding:
-            print(f"Gemini API returned empty embedding for text: {text[:50]}... using model {model_name}")
+            print(f"Gemini API returned empty embedding for text: {text[:50]}...")
         return embedding
     except Exception as e:
         print(f"Gemini embed_content error: {str(e)}")

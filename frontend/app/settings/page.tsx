@@ -80,7 +80,7 @@ export default function SettingsPage() {
                 )}
 
                 <form onSubmit={handleUpdateProfile} className="space-y-6">
-                    <div className="rounded-xl border border-gray-700 bg-gray-900 p-6">
+                    <div className="rounded-xl border border-gray-800 bg-black p-6">
                         <h2 className="text-lg font-semibold text-white mb-6">Profile Information</h2>
 
                         <div className="space-y-4">
@@ -97,7 +97,7 @@ export default function SettingsPage() {
                                             displayName: e.target.value,
                                         })
                                     }
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-700 bg-gray-800 text-white focus:outline-none focus:border-gray-500 transition-colors"
+                                    className="w-full px-4 py-2 rounded-lg border border-gray-800 bg-gray-900 text-white focus:outline-none focus:border-gray-600 transition-colors"
                                 />
                             </div>
 
@@ -109,34 +109,16 @@ export default function SettingsPage() {
                                     type="email"
                                     value={formData.email}
                                     disabled
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-700 bg-gray-800 text-gray-400 cursor-not-allowed"
+                                    className="w-full px-4 py-2 rounded-lg border border-gray-800 bg-gray-900 text-gray-400 cursor-not-allowed"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-2">
-                                    Profile Picture URL
-                                </label>
-                                <input
-                                    type="url"
-                                    value={formData.photoURL}
-                                    onChange={(e) =>
-                                        setFormData({
-                                            ...formData,
-                                            photoURL: e.target.value,
-                                        })
-                                    }
-                                    placeholder="https://..."
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-700 bg-gray-800 text-white focus:outline-none focus:border-gray-500 transition-colors"
-                                />
                             </div>
                         </div>
 
                         <button
                             type="submit"
                             disabled={loading}
-                            className="mt-6 px-6 py-2 rounded-lg bg-gray-700 text-white font-medium transition-colors hover:bg-gray-600 disabled:opacity-50"
+                            className="mt-6 px-6 py-2 rounded-lg bg-gray-800 text-white font-medium transition-colors hover:bg-gray-700 disabled:opacity-50"
                         >
                             {loading ? 'Saving...' : 'Save Changes'}
                         </button>

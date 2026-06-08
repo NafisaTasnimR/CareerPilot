@@ -6,7 +6,6 @@ import Link from "next/link";
 import { Upload, Cpu, Compass, ArrowDown, UserPlus } from "lucide-react";
 import AuthModal from "@/components/authentication/auth-modal";
 
-// ─── Pilot Cap Icon (kept for consistency, though not used in header) ─────────
 const PilotCapIcon = ({ className = "w-8 h-8" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M12 4C7.58172 4 4 7.58172 4 12C4 16.4183 7.58172 20 12 20C16.4183 20 20 16.4183 20 12C20 7.58172 16.4183 4 12 4Z" fill="currentColor" fillOpacity="0.2" stroke="currentColor" strokeWidth="1.5" />
@@ -17,7 +16,6 @@ const PilotCapIcon = ({ className = "w-8 h-8" }: { className?: string }) => (
   </svg>
 );
 
-// ─── Stars Background ──────────────────────────────────────────────────────────
 const StarsBackground = () => {
   const [stars, setStars] = useState<Array<{ id: number; style: React.CSSProperties }>>([]);
 
@@ -49,7 +47,6 @@ const StarsBackground = () => {
   );
 };
 
-// ─── Scroll Reveal Hook ────────────────────────────────────────────────────────
 function useScrollReveal() {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -68,7 +65,6 @@ function useScrollReveal() {
   return { ref, visible };
 }
 
-// ─── Step Section ──────────────────────────────────────────────────────────────
 interface StepSectionProps {
   number: string;
   icon: React.ReactNode;
@@ -89,7 +85,6 @@ const StepSection = ({ number, icon, title, subtitle, description, detail, isLas
         className={`max-w-3xl w-full mx-auto transition-all duration-1000 ease-out ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-16"
           }`}
       >
-        {/* Step number */}
         <div className="flex items-center gap-3 mb-8">
           <span className="text-xs font-mono tracking-[0.3em] uppercase text-white/50">
             STEP {number}
@@ -97,12 +92,10 @@ const StepSection = ({ number, icon, title, subtitle, description, detail, isLas
           <div className="h-px flex-1 max-w-[60px] bg-white/20" />
         </div>
 
-        {/* Icon */}
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-8 bg-white/[0.06] border border-white/[0.12]">
           <div className="text-white/80">{icon}</div>
         </div>
 
-        {/* Title */}
         <h2 className="text-5xl md:text-7xl font-black text-white leading-none tracking-tight mb-4">
           {title}
         </h2>
@@ -110,19 +103,16 @@ const StepSection = ({ number, icon, title, subtitle, description, detail, isLas
           {subtitle}
         </p>
 
-        {/* Description */}
         <p className="text-lg text-white/40 leading-relaxed mb-8 max-w-2xl">
           {description}
         </p>
 
-        {/* Detail callout */}
         <div className="inline-flex items-start gap-3 px-5 py-4 rounded-xl text-sm text-white/50 leading-relaxed max-w-xl bg-white/[0.04] border border-white/[0.08]">
-          <span className="text-white/40 shrink-0 mt-0.5">→</span>
+          <span className="text-white/40 shrink-0 mt-0.5"></span>
           {detail}
         </div>
       </div>
 
-      {/* Scroll hint */}
       {!isLast && (
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/20 animate-bounce-slow">
           <ArrowDown className="w-4 h-4" />
@@ -132,7 +122,6 @@ const StepSection = ({ number, icon, title, subtitle, description, detail, isLas
   );
 };
 
-// ─── Landing Page ──────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const heroReveal = useScrollReveal();
   const [modalOpen, setModalOpen] = useState(false);
@@ -151,7 +140,7 @@ export default function LandingPage() {
     <div className="relative bg-black text-white overflow-x-hidden">
       <StarsBackground />
 
-      {/* ── Header ── */}
+      {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-10 py-5 border-b border-white/[0.06] backdrop-blur-md bg-black/40">
         <div className="flex items-center gap-2">
           <span className="text-lg tracking-tight text-white/90 font-regular">CareerPilot</span>
@@ -173,14 +162,13 @@ export default function LandingPage() {
         </nav>
       </header>
 
-      {/* ── Hero ── */}
+      {/* Hero */}
       <section className="relative min-h-screen flex flex-col items-center justify-center text-center px-6 pt-24">
         <div
           ref={heroReveal.ref}
           className={`max-w-4xl mx-auto transition-all duration-1200 ease-out ${heroReveal.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
             }`}
         >
-          {/* Headline */}
           <h1 className="text-6xl md:text-8xl font-black leading-none tracking-tighter text-white mb-6">
             Pilot Your
             <br />
@@ -188,8 +176,8 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-lg md:text-xl text-white/40 max-w-xl mx-auto leading-relaxed mb-14">
-            Upload your CV once. Get job matches, skill gap analysis, a personalized
-            learning roadmap, and cover letters — all grounded in your real profile.
+            Upload your CV once. Get job matches, skill gap analysis, a personalised
+            roadmap, and cover letters — all based on your real profile.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -203,56 +191,54 @@ export default function LandingPage() {
               onClick={() => document.getElementById("step-1")?.scrollIntoView({ behavior: "smooth" })}
               className="px-8 py-3.5 rounded-full text-sm font-medium text-white/30 hover:text-white/60 transition-colors duration-200 tracking-wide"
             >
-              See how it works ↓
+              See how it works
             </button>
           </div>
         </div>
 
-        {/* Hero ambient */}
         <div className="absolute inset-0 pointer-events-none" style={{
           background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(255,255,255,0.03) 0%, transparent 70%)"
         }} />
 
-        {/* Scroll indicator */}
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
           <div className="w-px h-12 bg-gradient-to-b from-transparent via-white/20 to-transparent animate-scroll-line" />
         </div>
       </section>
 
-      {/* ── Step 1 ── */}
+      {/* Step 1 */}
       <div id="step-1">
         <StepSection
           number="01"
           icon={<Upload className="w-7 h-7" />}
-          title="Upload Your Resume"
+          title="Upload Your CV"
           subtitle="PDF or DOCX — we handle both."
-          description="Drop your existing resume into CareerPilot. Our parser reads every line — job titles, dates, descriptions, skills — exactly as you wrote them. No reformatting, no data loss."
-          detail="Supports PDF and DOCX. Your file is uploaded securely to cloud storage and never shared. You can re-upload at any time to keep your profile current."
+          description="Drop your existing CV and CareerPilot reads it in full — your experience, education, skills, and projects, exactly as you wrote them."
+          detail="Supports PDF and DOCX. Your file is stored securely and never shared. Re-upload anytime to keep your profile current."
         />
       </div>
 
-      {/* ── Step 2 ── */}
+      {/* Step 2 */}
       <StepSection
         number="02"
         icon={<Cpu className="w-7 h-7" />}
-        title="AI Structures & Indexes"
-        subtitle="Gemini reads between the lines."
-        description="Your resume is split into semantic chunks by section — experience, education, skills, projects. Each chunk is embedded into a vector index that every downstream feature queries."
-        detail="This is what makes CareerPilot different. Every answer, every job match, every cover letter is grounded in your actual data — not a hallucinated generic profile."
+        title="We Learn Who You Are"
+        subtitle="Every feature is built around your real background."
+        description="Your CV is broken into sections and indexed so that every job match, skill gap, and cover letter is grounded in your actual experience — not a generic template."
+        detail="This is what makes CareerPilot different. Nothing is made up. Every answer is based on what you have actually done."
       />
 
-      {/* ── Step 3 ── */}
+      {/* Step 3 */}
       <StepSection
         number="03"
         icon={<Compass className="w-7 h-7" />}
-        title="Your Co‑pilot Takes Over"
-        subtitle="Hunt jobs. Spot gaps. Draft letters."
-        description="Ask your AI assistant anything — 'Am I ready for this data engineer role?', 'What skills am I missing for Google?', 'Draft a cover letter for this posting'. It knows who you are before you say a word."
-        detail="Job Hunter finds live openings and scores each one against your CV. Gap analysis shows exactly what to learn next. Progress tracker keeps you accountable week by week."
+        title="Your Co-pilot Takes Over"
+        subtitle="Find jobs. Close skill gaps. Stay on track."
+        description="Search for live job openings and see how well each one matches your profile. Ask your AI assistant anything about your career. Track every application on a Kanban board. Set weekly goals and get reminders when you go quiet."
+        detail="Job Hunter, AI Assistant, Skill Gap Analysis, Cover Letter Generator, Application Tracker, and Progress Dashboard — all in one place."
         isLast
       />
 
-      {/* ── CTA ── */}
+      {/* CTA */}
       <section className="relative min-h-[60vh] flex flex-col items-center justify-center text-center px-6 py-24">
         <div className="max-w-2xl mx-auto">
           <p className="text-xs tracking-[0.3em] uppercase text-white/20 mb-6">Ready to fly?</p>
@@ -271,19 +257,18 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Footer ── */}
+      {/* Footer */}
       <footer className="relative border-t border-white/[0.06] py-10 px-6">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="text-sm text-white/30 font-regular">CareerPilot</span>
           </div>
           <p className="text-xs text-white/15">
-            © {new Date().getFullYear()} CareerPilot
+            {new Date().getFullYear()} CareerPilot
           </p>
         </div>
       </footer>
 
-      {/* Auth Modal */}
       <AuthModal
         isOpen={modalOpen}
         mode={modalMode}
@@ -291,7 +276,6 @@ export default function LandingPage() {
         onToggleMode={toggleModalMode}
       />
 
-      {/* ── Global Styles ── */}
       <style jsx global>{`
         * { box-sizing: border-box; }
         html { scroll-behavior: smooth; background: #000; }

@@ -1,5 +1,4 @@
 import os
-import random
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -129,16 +128,7 @@ def generate_cover_letter(req: CoverLetterRequest):
     except Exception:
         pass
 
-    styles = [
-        "confident and direct, leading with your biggest achievement",
-        "storytelling style, opening with a specific problem you solved",
-        "data-driven, emphasizing measurable results and impact",
-        "enthusiastic and forward-looking, focusing on future contributions",
-        "concise and punchy, every sentence earning its place",
-    ]
-    style = random.choice(styles)
-
-    prompt = f"""Write a professional job application cover letter. Style: {style}.
+    prompt = f"""Write a formal, concise job application cover letter.
 
 Company: {req.company}
 Role: {req.role}
@@ -146,23 +136,23 @@ Role: {req.role}
 {f"Candidate background: {cv_context[:1500]}" if cv_context else ""}
 
 Requirements:
-- Start with "Dear Hiring Manager," 
-- Paragraph 1: Why you want THIS role at THIS company specifically
-- Paragraph 2: Your most relevant experience and achievements for this role
-- Paragraph 3: Brief closing expressing enthusiasm and call to action
-- End with "Sincerely," followed by a blank line for the signature
-- Under 300 words total
-- Style: {style}
-- Sound human and specific, NOT generic
-- Do NOT use placeholder text like [Your Name] or [Date]
-- Do NOT write a story about a past incident unless it directly relates to the role"""
+- Start with "Dear Hiring Manager,"
+- Paragraph 1: Express genuine interest in this specific role and company in one or two sentences
+- Paragraph 2: Highlight the most relevant skills and experience from the candidate background that directly match this role
+- Paragraph 3: One sentence closing expressing availability for an interview
+- End with "Sincerely," on its own line, then leave the signature line blank
+- Under 250 words total
+- Formal professional tone — no storytelling, no dramatised past incidents, no generic phrases
+- Be specific and direct. Every sentence must serve a purpose.
+- Do NOT invent experience that is not in the candidate background
+- Do NOT add any name after Sincerely"""
 
     try:
         response = _groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=600,
-            temperature=0.7,
+            temperature=0.5,
         )
         cover_letter = response.choices[0].message.content.strip()
     except Exception as e:

@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { auth } from '@/lib/firebase'
 
 const COLUMNS = [
-  { id: 'Applied',      bg: 'rgba(59,130,246,0.08)',  border: 'rgba(59,130,246,0.25)',  dot: '#3b82f6'  },
-  { id: 'Interviewing', bg: 'rgba(234,179,8,0.08)',   border: 'rgba(234,179,8,0.25)',   dot: '#eab308'  },
-  { id: 'Offer',        bg: 'rgba(34,197,94,0.08)',   border: 'rgba(34,197,94,0.25)',   dot: '#22c55e'  },
-  { id: 'Rejected',     bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.25)',   dot: '#ef4444'  },
+  { id: 'Applied', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.25)', dot: '#3b82f6' },
+  { id: 'Interviewing', bg: 'rgba(234,179,8,0.08)', border: 'rgba(234,179,8,0.25)', dot: '#eab308' },
+  { id: 'Offer', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.25)', dot: '#22c55e' },
+  { id: 'Rejected', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.25)', dot: '#ef4444' },
 ]
 
 interface App {
@@ -15,6 +15,7 @@ interface App {
   company: string
   role: string
   status: string
+  notes?: string
   applied_date?: string
   redirect_url?: string
   fit_score?: number
@@ -24,16 +25,16 @@ interface App {
 }
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
-    return new Promise((resolve) => {
-        const unsubscribe = auth.onAuthStateChanged(async (user) => {
-            unsubscribe()
-            const token = await user?.getIdToken()
-            resolve({
-                'Content-Type': 'application/json',
-                ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-            })
-        })
+  return new Promise((resolve) => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      unsubscribe()
+      const token = await user?.getIdToken()
+      resolve({
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      })
     })
+  })
 }
 
 export default function KanbanBoard({ userId = '', api = 'http://localhost:8000' }: { userId?: string; api?: string }) {
@@ -44,15 +45,15 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
   const [dragging, setDragging] = useState<string | null>(null)
 
   const [showForm, setShowForm] = useState(false)
-  const [fCompany, setFCompany]   = useState('')
-  const [fRole, setFRole]         = useState('')
-  const [fNotes, setFNotes]       = useState('')
+  const [fCompany, setFCompany] = useState('')
+  const [fRole, setFRole] = useState('')
+  const [fNotes, setFNotes] = useState('')
   const [fDeadline, setFDeadline] = useState('')
-  const [fUrl, setFUrl]           = useState('')
+  const [fUrl, setFUrl] = useState('')
 
   const [detailApp, setDetailApp] = useState<App | null>(null)
-  const [clApp, setClApp]         = useState<App | null>(null)
-  const [clText, setClText]       = useState('')
+  const [clApp, setClApp] = useState<App | null>(null)
+  const [clText, setClText] = useState('')
   const [clLoading, setClLoading] = useState(false)
 
   const loadApps = useCallback(async () => {
@@ -61,7 +62,7 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
       const res = await fetch(`${baseApi}/kanban/`, { headers })
       const data = await res.json()
       setApps(Array.isArray(data) ? data : [])
-    } catch {}
+    } catch { }
     setLoading(false)
   }, [baseApi])
 
@@ -75,6 +76,7 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
       headers,
       body: JSON.stringify({
         company: fCompany, role: fRole,
+        notes: fNotes || null,
         deadline: fDeadline || null,
         redirect_url: fUrl || null,
         status: 'Applied', source: 'manual',
@@ -118,15 +120,23 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
     setClText('')
     try {
       const headers = await getAuthHeaders()
+      // Pass Firebase UID as user_id for backend lookup
       const res = await fetch(`${baseApi}/kanban/cover-letter`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ company: app.company, role: app.role, user_id: userId }),
+        body: JSON.stringify({
+          company: app.company,
+          role: app.role,
+          user_id: userId,
+          notes: app.notes,
+        }),
       })
       const data = await res.json()
       setClText(data.cover_letter)
       setApps(prev => prev.map(a => a.id === app.id ? { ...a, cover_letter: data.cover_letter } : a))
-    } catch { setClText('Failed to generate. Please try again.') }
+    } catch {
+      setClText('Failed to generate. Please try again.')
+    }
     setClLoading(false)
   }
 
@@ -225,7 +235,7 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
                   </div>
                 )}
                 {app.deadline && (
-                  <p style={{ color: '#f87171', fontSize: 10, margin: '6px 0 0 0' }}>⏰ {app.deadline}</p>
+                  <p style={{ color: '#f87171', fontSize: 10, margin: '6px 0 0 0' }}>Due {app.deadline}</p>
                 )}
               </div>
             ))}
@@ -272,7 +282,7 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {detailApp.deadline && (
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 12px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8 }}>
-                    <span style={{ color: '#f87171', fontSize: 12 }}>⏰ Deadline:</span>
+                    <span style={{ color: '#f87171', fontSize: 12 }}>Deadline:</span>
                     <span style={{ color: 'white', fontSize: 12 }}>{detailApp.deadline}</span>
                   </div>
                 )}
@@ -291,23 +301,34 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
                     <span style={{ color: 'white', fontSize: 12 }}>{detailApp.fit_score}%</span>
                   </div>
                 )}
-
+                {detailApp.notes && (
+                  <div style={{ padding: '8px 12px', background: '#1f1f1f', borderRadius: 8 }}>
+                    <span style={{ color: '#6b7280', fontSize: 11, display: 'block', marginBottom: 4 }}>Notes</span>
+                    <p style={{ color: '#e5e7eb', fontSize: 13, margin: 0, lineHeight: 1.5 }}>{detailApp.notes}</p>
+                  </div>
+                )}
               </div>
 
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 {detailApp.redirect_url && (
                   <a href={detailApp.redirect_url} target="_blank" rel="noopener noreferrer"
-                    style={{ padding: '8px 14px', background: 'rgba(59,130,246,0.15)', color: 'rgb(147,197,253)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, fontSize: 12, textDecoration: 'none' }}>
-                    ↗ View job
+                    style={{ padding: '8px 14px', background: 'rgba(59,130,246,0.15)', color: 'rgb(147,197,253)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, fontSize: 12, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                    View job
                   </a>
                 )}
                 <button onClick={() => { setDetailApp(null); generateCoverLetter(detailApp) }}
-                  style={{ padding: '8px 14px', background: 'rgba(168,85,247,0.15)', color: 'rgb(196,181,253)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
-                  ✦ Cover letter
+                  style={{ padding: '8px 14px', background: 'rgba(168,85,247,0.15)', color: 'rgb(196,181,253)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 8, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>
+                  Cover letter
                 </button>
+                <div style={{ flex: 1 }} />
                 <button onClick={() => deleteApp(detailApp.id)}
-                  style={{ padding: '8px 14px', background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
-                  Delete
+                  title="Delete application"
+                  style={{ padding: '8px', background: 'transparent', color: '#6b7280', border: '1px solid transparent', borderRadius: 8, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#f87171'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(239,68,68,0.2)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#6b7280'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'transparent' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
                 </button>
               </div>
             </div>
@@ -332,7 +353,7 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
               {clLoading ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#6b7280', fontSize: 13 }}>
                   <span style={{ display: 'inline-block', width: 16, height: 16, border: '2px solid #4b5563', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                  Generating personalized cover letter...
+                  Generating cover letter...
                 </div>
               ) : (
                 <textarea value={clText} onChange={e => setClText(e.target.value)}
@@ -342,16 +363,19 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
 
             <div style={{ padding: '16px 24px', borderTop: '1px solid #222', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => generateCoverLetter(clApp, true)} disabled={clLoading}
-                style={{ padding: '8px 14px', background: 'transparent', color: '#9ca3af', border: '1px solid #2a2a2a', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
-                ↻ Regenerate
+                style={{ padding: '8px 14px', background: 'transparent', color: '#9ca3af', border: '1px solid #2a2a2a', borderRadius: 8, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2H3v16h5v4l4-4h5l4-4V2z" /><path d="M12 8v4M12 16h.01" /></svg>
+                Regenerate
               </button>
               <button onClick={() => navigator.clipboard.writeText(clText)}
-                style={{ padding: '8px 14px', background: 'rgba(59,130,246,0.15)', color: 'rgb(147,197,253)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
+                style={{ padding: '8px 14px', background: 'rgba(59,130,246,0.15)', color: 'rgb(147,197,253)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
                 Copy
               </button>
               <button onClick={() => clApp && openGmailCompose(clApp, clText)} disabled={clLoading || !clText}
                 style={{ padding: '8px 16px', background: 'white', color: 'black', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                ✉ Open in Gmail →
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L12 9.641l8.073-6.148C21.69 2.28 24 3.434 24 5.457z" /></svg>
+                Open in Gmail
               </button>
             </div>
           </div>

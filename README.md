@@ -3,18 +3,18 @@
 **CareerPilot** is a full‑stack web application that helps job seekers optimise their job search.  
 Upload your CV once, and let our AI assistant analyse your profile, find matching roles, identify skill gaps, draft cover letters, and create a personalised learning roadmap.
 
-> Built for the **Hackathon** – fully functional, container‑ready, and deployed on modern cloud infrastructure.
-
 ---
 
 ## Table of Contents
 
 - [Features](#features)
 - [Tech Stack](#tech-stack)
-- [How It Works (For Judges)](#how-it-works-for-judges)
+- [How It Works](#how-it-works)
 - [Prerequisites](#prerequisites)
-- [Running the Project](#running-the-project)
+- [Setup Instruction](#setup)
 - [User Guide ](#user-guide-with-screenshots)
+- [Deployment Link](#deployment-link)
+- [Team Members](#team-members)
 ---
 
 ## Features
@@ -42,7 +42,7 @@ Upload your CV once, and let our AI assistant analyse your profile, find matchin
 
 ---
 
-## How It Works (For Judges)
+## How It Works
 
 1. **User signs in** with Google → Firebase token is sent to the backend.
 2. **CV upload** – PDF/DOCX file is stored in Supabase Storage.
@@ -58,12 +58,17 @@ Upload your CV once, and let our AI assistant analyse your profile, find matchin
 ## Prerequisites
 
 - **Node.js** 18+ and **npm**
-- **Python** 3.12 (recommended) – *avoid Python 3.13* (compatibility issues with some libraries)
+- **Python** 3.12 (recommended) or higher
 - **Supabase account** – free tier is sufficient
 - **Google Cloud project** with **Firebase** enabled (for authentication)
 - **Gemini API key** – from [Google AI Studio](https://aistudio.google.com/)
 
 ---
+# Setup
+[Dependency Documentation](docs/Dependencies__Documentation.pdf)
+
+---
+
 # CareerPilot – User Guide
 
 Welcome to **CareerPilot**! This guide walks you through every feature of the platform, from signing in to using the AI assistant and tracking your job applications.
@@ -202,4 +207,12 @@ Welcome to **CareerPilot**! This guide walks you through every feature of the pl
 ## 9. Deployment Link
 - [CareerPilot](https://career-pilot-zeta.vercel.app/)
 
+---
+
+## 10. Team Members
+- **Sanjana Afreen**
+- **Nishat Tasneem Oishee**
+- **Nafisa Tasnim**
+
+---
 

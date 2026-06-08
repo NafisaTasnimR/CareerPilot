@@ -59,15 +59,8 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
 
   useEffect(() => {
     if (!stats) return
-    const bd = stats.status_breakdown || {}
-    const _app = bd['Applied'] ?? 0; const _int = bd['Interviewing'] ?? 0
-    const _off = bd['Offer'] ?? 0;   const _rej = bd['Rejected'] ?? 0
-    const _score = _app * 1 + _int * 2 + _off * 4
-    const _ceil  = Math.max(_app + _int + _off + _rej, 1) * 2
-    const _pipePct = Math.min(_score / _ceil, 1) * 100
-    const _goalPct = stats.goals_total > 0 ? (stats.goals_completed / stats.goals_total) * 100 : 0
-    const _taskPct = stats.tasks_total  > 0 ? (stats.tasks_completed  / stats.tasks_total)  * 100 : 0
-    targetRef.current = Math.round(_pipePct * 0.60 + _goalPct * 0.25 + _taskPct * 0.15) / 100
+    const _taskPct = stats.tasks_total > 0 ? (stats.tasks_completed / stats.tasks_total) * 100 : 0
+    targetRef.current = Math.round(_taskPct) / 100
     if (canvasRef.current && !loopStarted.current) {
       const canvas = canvasRef.current
       canvas.width  = canvas.clientWidth * window.devicePixelRatio
@@ -138,7 +131,7 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
       ctx.stroke()
 
       // Gold progress line
-      const progressT = 0.04 + p * 0.80
+      const progressT = 0.03 + p * 0.94
       ctx.beginPath()
       ctx.moveTo(ax0, ay0)
       for (let t = 0; t <= progressT; t += 0.005) {
@@ -181,7 +174,7 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
       ctx.restore()
 
       // Figure
-      const figT = 0.04 + p * 0.80
+      const figT = 0.03 + p * 0.94
       const fmt  = 1 - figT
       const figX = fmt*fmt*ax0 + 2*fmt*figT*acx + figT*figT*ax1
       const figY = fmt*fmt*ay0 + 2*fmt*figT*acy + figT*figT*ay1
@@ -259,24 +252,9 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
   // ── Computed values
   const breakdown = stats.status_breakdown || {}
 
-  // Pipeline-based progress: weight each stage by career advancement value
-  // Applied=1pt, Interviewing=2pts, Offer=4pts, Rejected=0pts
-  // Score is capped at a realistic ceiling so it actually reaches 100%
-  const applied      = breakdown['Applied']      ?? 0
-  const interviewing = breakdown['Interviewing'] ?? 0
-  const offered      = breakdown['Offer']        ?? 0
-  const rejected     = breakdown['Rejected']     ?? 0
-  const pipelineScore  = applied * 1 + interviewing * 2 + offered * 4
-  // Ceiling = if every app reached interview stage (realistic best-case)
-  const total_apps_for_ceil = Math.max(applied + interviewing + offered + rejected, 1)
-  const pipelineCeil = total_apps_for_ceil * 2   // avg weight = 2 (interview stage)
-  const pipelinePct  = Math.min(pipelineScore / pipelineCeil, 1) * 100
-
-  const goalPct = stats.goals_total > 0 ? (stats.goals_completed / stats.goals_total) * 100 : 0
-  const taskPct = stats.tasks_total  > 0 ? (stats.tasks_completed  / stats.tasks_total)  * 100 : 0
-
-  // Final score: pipeline is the primary signal (60%), goals (25%), tasks (15%)
-  const pct = Math.round(pipelinePct * 0.60 + goalPct * 0.25 + taskPct * 0.15)
+  // Progress = pure task completion
+  const taskPct = stats.tasks_total > 0 ? (stats.tasks_completed / stats.tasks_total) * 100 : 0
+  const pct = Math.round(taskPct)
 
   // Always derive total from actual breakdown counts so per-status %
   // is never wrong when total_applications is 0 or mismatched.
@@ -298,17 +276,11 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
   })
 
   // Bars proportional to max count — widest fills 72%, rest scale relative
-  const maxCount = Math.max(...rows.map(r => r.count), 1)
-
-  const responseRate = parseFloat((
-    ((breakdown['Interviewing']??0) + (breakdown['Offer']??0) + (breakdown['Rejected']??0)) / total * 100
-  ).toFixed(1))
   const offerRate = parseFloat(((breakdown['Offer']??0) / total * 100).toFixed(1))
 
   const metricCards = [
     { label: 'Total',         value: String(total),                          color: TEXT },
     { label: 'This week',     value: `+${stats.weekly_applications ?? 0}`,   color: ACCENT },
-    { label: 'Response rate', value: `${responseRate}%`,                     color: TEXT },
     { label: 'Offer rate',    value: `${offerRate}%`,                        color: '#4dd6a0' },
     { label: 'Tasks done',    value: `${stats.tasks_completed ?? 0} / ${stats.tasks_total ?? 0}`, color: TEXT },
   ]
@@ -359,7 +331,7 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
 
           {rows.map((row) => {
             // Bar fills to 70% of container max so the widest bar doesn't crowd the label
-            const barPct = Math.round((row.count / maxCount) * 70)
+            const barPct = Math.round((row.count / total) * 90)
 
             return (
               <div key={row.key}

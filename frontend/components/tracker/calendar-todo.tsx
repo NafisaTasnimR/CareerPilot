@@ -246,7 +246,15 @@ useEffect(() => {
 
         /* date inputs */
         .ctd-date { color-scheme: dark; }
-        .ctd-date::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; filter: invert(1); }
+        .ctd-date::-webkit-calendar-picker-indicator {
+          cursor: pointer;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23E0A84A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Cline x1='16' y1='2' x2='16' y2='6'%3E%3C/line%3E%3Cline x1='8' y1='2' x2='8' y2='6'%3E%3C/line%3E%3Cline x1='3' y1='10' x2='21' y2='10'%3E%3C/line%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-size: 14px 14px;
+          width: 16px; height: 16px;
+          opacity: 1;
+          filter: none;
+        }
 
         /* checkbox — circle for goals */
         .ctd-chk-circle {
@@ -380,7 +388,7 @@ useEffect(() => {
                   key={arrow}
                   className="ctd-nav"
                   onClick={i === 0 ? prevMonth : nextMonth}
-                  style={{ width: 36, height: 36, background: 'transparent', border: `1px solid ${P.border}`, color: P.text2, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', fontFamily: 'inherit' }}
+                  style={{ width: 36, height: 36, background: 'transparent', border: `1px solid ${P.goldBorder}`, color: P.goldText, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', fontFamily: 'inherit' }}
                 >
                   {arrow}
                 </button>
@@ -417,8 +425,11 @@ useEffect(() => {
                 const ds      = toDateStr(calYear, calMonth, day)
                 const goalDl  = goals.filter(g => g.deadline === ds)
                 const taskDl  = tasks.filter(t => t.due_date === ds)
+                const jobDl   = taskDl.filter(t => t.id.startsWith('app-'))
+                const regTaskDl = taskDl.filter(t => !t.id.startsWith('app-'))
                 const isToday = ds === todayStr
                 const hasAny  = goalDl.length > 0 || taskDl.length > 0
+                const isJobOnly = jobDl.length > 0 && goalDl.length === 0 && regTaskDl.length === 0
 
                 return (
                   <div
@@ -429,14 +440,19 @@ useEffect(() => {
                     style={{
                       minHeight: 110, padding: '10px 8px 8px',
                       borderRight: borderR, borderBottom: borderB,
-                      background: isToday ? P.todayBg : hasAny && goalDl.length > 0 && taskDl.length > 0
-                        ? 'rgba(139,111,212,0.18)'
+                      background: hasAny && goalDl.length > 0 && taskDl.length > 0
+                        ? (isToday ? 'rgba(139,111,212,0.22)' : 'rgba(139,111,212,0.18)')
                         : hasAny && goalDl.length > 0
-                        ? 'rgba(224,168,74,0.14)'
+                        ? (isToday ? 'rgba(224,168,74,0.18)' : 'rgba(224,168,74,0.14)')
+                        : isJobOnly
+                        ? (isToday ? 'rgba(224,80,80,0.18)' : 'rgba(224,80,80,0.13)')
                         : hasAny
-                        ? 'rgba(62,201,154,0.12)'
-                        : 'transparent',
+                        ? (isToday ? 'rgba(62,201,154,0.16)' : 'rgba(62,201,154,0.12)')
+                        : isToday ? 'rgba(255,255,255,0.04)' : 'transparent',
                       position: 'relative', transition: 'background 0.15s',
+                      outline: isToday ? '1.5px solid rgba(255,255,255,0.22)' : 'none',
+                      outlineOffset: '-1px',
+
                     }}
                   >
                     {/* Number */}
@@ -444,13 +460,13 @@ useEffect(() => {
                       <span style={{
                         fontFamily: "'Cormorant Garamond', serif",
                         fontSize: 17, fontWeight: 500,
-                        color: isToday ? '#FFD060' : '#E8E3DA',
+                        color: isToday ? '#FFFFFF' : '#E8E3DA',
                         lineHeight: 1,
                       }}>
                         {day}
                       </span>
                       {isToday && (
-                        <span style={{ fontSize: 8, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#FFD060', background: 'rgba(224,168,74,0.22)', border: '1px solid rgba(224,168,74,0.5)', padding: '1px 5px' }}>
+                        <span style={{ fontSize: 8, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)', padding: '1px 5px', borderRadius: 2 }}>
                           today
                         </span>
                       )}
@@ -474,13 +490,46 @@ useEffect(() => {
                           </span>
                         </div>
                       ))}
-                      {taskDl.slice(0, 1).map(t => (
+                      {taskDl.slice(0, 1).map(t => {
+                        const pg = goals.find(g => g.id === t.goal_id)
+                        const isJobDeadline = t.id.startsWith('app-')
+                        return isJobDeadline ? (
+                          <div key={t.id} style={{
+                            display: 'flex', flexDirection: 'column',
+                            background: 'rgba(224,80,80,0.28)',
+                            borderLeft: '3px solid #E05050',
+                            padding: '4px 6px',
+                          }}>
+                            <span style={{
+                              fontSize: 8, fontWeight: 700, letterSpacing: '0.14em',
+                              textTransform: 'uppercase', color: '#FF8080',
+                              background: 'rgba(224,80,80,0.35)',
+                              border: '1px solid rgba(224,80,80,0.5)',
+                              padding: '1px 4px', marginBottom: 3,
+                              alignSelf: 'flex-start', lineHeight: 1.4,
+                            }}>⚠ Job Deadline</span>
+                            <span style={{
+                              fontSize: 11, color: '#FF8080',
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                              fontWeight: 500, lineHeight: 1.3,
+                            }}>
+                              {t.title}
+                            </span>
+                          </div>
+                        ) : (
                         <div key={t.id} style={{
-                          display: 'flex', alignItems: 'center', gap: 5,
+                          display: 'flex', flexDirection: 'column',
                           background: 'rgba(62,201,154,0.22)',
                           borderLeft: '3px solid #3EC99A',
                           padding: '4px 6px',
                         }}>
+                          {pg && (
+                            <span style={{
+                              fontSize: 9, color: '#E0A84A', letterSpacing: '0.08em',
+                              textTransform: 'uppercase', fontWeight: 600, lineHeight: 1.2,
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 1,
+                            }}>{pg.title}</span>
+                          )}
                           <span style={{
                             fontSize: 11, color: '#70F5CC',
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -489,7 +538,8 @@ useEffect(() => {
                             {t.title}
                           </span>
                         </div>
-                      ))}
+                        )
+                      })}
                       {(goalDl.length > 1 || taskDl.length > 1 || goalDl.length + taskDl.length > 2) && (
                         <span style={{ fontSize: 10, color: P.text2, paddingLeft: 4 }}>
                           +{Math.max(0, goalDl.length + taskDl.length - 2)} more
@@ -517,8 +567,13 @@ useEffect(() => {
                         ))}
                         {taskDl.map(t => (
                           <div key={t.id} style={{ display: 'flex', gap: 8, padding: '3px 0', alignItems: 'flex-start' }}>
-                            <div style={{ width: 3, height: 3, borderRadius: '50%', background: P.green, marginTop: 5, flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, color: t.completed ? P.text3 : P.text1, textDecoration: t.completed ? 'line-through' : 'none', lineHeight: 1.5 }}>{t.title}</span>
+                            <div style={{ width: 3, height: 3, borderRadius: '50%', background: t.id.startsWith('app-') ? P.red : P.green, marginTop: 5, flexShrink: 0 }} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              {t.id.startsWith('app-') && (
+                                <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: P.redText, background: P.redDim, border: `1px solid ${P.redBorder}`, padding: '1px 4px', alignSelf: 'flex-start', lineHeight: 1.4 }}>⚠ Job Deadline</span>
+                              )}
+                              <span style={{ fontSize: 12, color: t.completed ? P.text3 : (t.id.startsWith('app-') ? P.redText : P.text1), textDecoration: t.completed ? 'line-through' : 'none', lineHeight: 1.5 }}>{t.title}</span>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -530,14 +585,14 @@ useEffect(() => {
 
             {/* Legend */}
             <div style={{ display: 'flex', gap: 28, marginTop: 20, paddingTop: 16, borderTop: `1px solid ${P.border}` }}>
-              {[[P.gold, 'Goal deadline'], [P.green, 'Task due date']].map(([color, label]) => (
+              {[[P.gold, 'Goal deadline'], [P.green, 'Task due date'], [P.red, 'Job deadline']].map(([color, label]) => (
                 <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 10, height: 1, background: color }} />
                   <span style={{ fontSize: 11, color: '#9A948C', letterSpacing: '0.06em' }}>{label}</span>
                 </div>
               ))}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 8, height: 8, background: P.todayBg, border: `1px solid ${P.border}` }} />
+                <div style={{ width: 8, height: 8, background: 'transparent', border: '1px solid rgba(255,255,255,0.18)', outline: '1px solid rgba(255,255,255,0.06)', outlineOffset: '1px' }} />
                 <span style={{ fontSize: 11, color: '#9A948C', letterSpacing: '0.06em' }}>Today</span>
               </div>
             </div>
@@ -570,7 +625,7 @@ useEffect(() => {
                 <button
                   className="ctd-add-btn"
                   onClick={addGoal}
-                  style={{ padding: '9px 20px', background: 'transparent', border: `1px solid ${P.border}`, color: P.text1, fontSize: 11, fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s', whiteSpace: 'nowrap', flexShrink: 0 }}
+                  style={{ padding: '9px 20px', background: P.goldDim, border: `1px solid ${P.goldBorder}`, color: P.goldText, fontSize: 11, fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s', whiteSpace: 'nowrap', flexShrink: 0 }}
                 >
                   Add
                 </button>
@@ -695,7 +750,7 @@ useEffect(() => {
                               <button
                                 className="ctd-task-add"
                                 onClick={() => addTask(goal.id)}
-                                style={{ padding: '5px 12px', background: 'transparent', border: `1px solid ${P.border}`, color: P.text2, fontSize: 10, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', flexShrink: 0 }}
+                                style={{ padding: '5px 12px', background: P.greenDim, border: `1px solid ${P.greenBorder}`, color: P.greenText, fontSize: 10, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', flexShrink: 0 }}
                               >
                                 + Add
                               </button>

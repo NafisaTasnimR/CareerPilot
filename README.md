@@ -200,6 +200,6 @@ Welcome to **CareerPilot**! This guide walks you through every feature of the pl
 
 ---
 ## 9. Deployment Link
-![CareerPilot](https://career-pilot-zeta.vercel.app/)
+- [CareerPilot](https://career-pilot-zeta.vercel.app/)
 
 

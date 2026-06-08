@@ -74,7 +74,7 @@ Welcome to **CareerPilot**! This guide walks you through every feature of the pl
 
 ## 1. Landing Page
 
-![Landing page screenshot placeholder](docs/landing.png)
+![Landing page screenshot placeholder](docs/images/landing.png)
 
 - The landing page introduces the core features.
 - Click **Login** or **Sign Up** in the top‑right corner to begin.
@@ -84,7 +84,7 @@ Welcome to **CareerPilot**! This guide walks you through every feature of the pl
 
 ## 2. Sign In with Google
 
-![Google sign‑in modal](docs/auth-modal.png)
+![Google sign‑in modal](docs/images/auth-modal.png)
 
 - A pop‑up will ask you to select a Google account.
 - Grant basic profile access (email, name, profile picture).
@@ -96,7 +96,7 @@ Welcome to **CareerPilot**! This guide walks you through every feature of the pl
 
 ## 3. Upload Your CV
 
-![CV upload area](docs/upload.png)
+![CV upload area](docs/images/upload.png)
 
 - On the Dashboard, you’ll see a file drop zone.
 - Drag & drop a **PDF or DOCX** file (max 10 MB) or click to browse.
@@ -111,7 +111,7 @@ Welcome to **CareerPilot**! This guide walks you through every feature of the pl
 
 ## 4. Resume Overview
 
-![Parsed CV sections](docs/dashboard.png)
+![Parsed CV sections](docs/images/dashboard.png)
 
 - After indexing, the Dashboard displays a breakdown of your CV:
   - **Experience entries** – number of roles.
@@ -126,7 +126,7 @@ Welcome to **CareerPilot**! This guide walks you through every feature of the pl
 
 ## 5. AI Assistant
 
-![Assistant chat interface](docs/assistant.png)
+![Assistant chat interface](docs/images/assistant.png)
 
 - Navigate to **Assistant** from the side menu.
 - Type your question in the chat input and press **Enter** or click the **Send** button.
@@ -148,7 +148,7 @@ Welcome to **CareerPilot**! This guide walks you through every feature of the pl
 
 ## 6. Job Tracker (Kanban Board)
 
-![Kanban board](docs/kanban.png)
+![Kanban board](docs/images/kanban.png)
 
 - Go to **Tracker** from the side menu.
 - You’ll see four columns: **Applied**, **Interviewing**, **Offer**, **Rejected**.
@@ -171,7 +171,7 @@ Welcome to **CareerPilot**! This guide walks you through every feature of the pl
 
 ## 7. Progress Dashboard
 
-![Progress stats](docs/progress.png)
+![Progress stats](docs/images/progress.png)
 
 - The main Dashboard (home after login) shows your current stats:
   - Total applications sent
@@ -187,7 +187,7 @@ Welcome to **CareerPilot**! This guide walks you through every feature of the pl
 
 ## 8. Settings
 
-![Settings page](docs/settings.png)
+![Settings page](docs/images/settings.png)
 
 - Click your profile icon or navigate to **Settings**.
 - You can update your:

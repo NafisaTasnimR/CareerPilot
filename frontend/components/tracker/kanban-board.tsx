@@ -144,7 +144,6 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <p style={{ color: '#6b7280', fontSize: 13, margin: 0 }}>
-          {apps.length} total · {apps.filter(a => a.source !== 'manual').length} from Job Hunter · {apps.filter(a => a.source === 'manual').length} manual
         </p>
         <button
           onClick={() => setShowForm(v => !v)}
@@ -258,10 +257,10 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
                     <button key={col.id} onClick={() => moveCard(detailApp.id, col.id)}
                       style={{
                         padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                        background: detailApp.status === col.id ? col.dot : 'transparent',
-                        color: detailApp.status === col.id ? 'black' : col.dot,
-                        border: `1px solid ${col.dot}`,
-                        opacity: detailApp.status === col.id ? 1 : 0.7,
+                        background: detailApp.status === col.id ? `${col.dot}28` : 'transparent',
+                        color: col.dot,
+                        border: detailApp.status === col.id ? `2px solid ${col.dot}` : `1px solid ${col.dot}88`,
+                        opacity: detailApp.status === col.id ? 1 : 0.55,
                       }}>
                       {col.id}
                     </button>

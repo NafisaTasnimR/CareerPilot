@@ -131,7 +131,7 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
       ctx.stroke()
 
       // Gold progress line
-      const progressT = 0.04 + p * 0.80
+      const progressT = 0.03 + p * 0.94
       ctx.beginPath()
       ctx.moveTo(ax0, ay0)
       for (let t = 0; t <= progressT; t += 0.005) {
@@ -174,7 +174,7 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
       ctx.restore()
 
       // Figure
-      const figT = 0.04 + p * 0.80
+      const figT = 0.03 + p * 0.94
       const fmt  = 1 - figT
       const figX = fmt*fmt*ax0 + 2*fmt*figT*acx + figT*figT*ax1
       const figY = fmt*fmt*ay0 + 2*fmt*figT*acy + figT*figT*ay1
@@ -276,8 +276,6 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
   })
 
   // Bars proportional to max count — widest fills 72%, rest scale relative
-  const maxCount = Math.max(...rows.map(r => r.count), 1)
-
   const offerRate = parseFloat(((breakdown['Offer']??0) / total * 100).toFixed(1))
 
   const metricCards = [
@@ -333,7 +331,7 @@ export default function ProgressDashboard({ userId, api }: { userId: string; api
 
           {rows.map((row) => {
             // Bar fills to 70% of container max so the widest bar doesn't crowd the label
-            const barPct = Math.round((row.count / maxCount) * 70)
+            const barPct = Math.round((row.count / total) * 90)
 
             return (
               <div key={row.key}

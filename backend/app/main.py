@@ -8,11 +8,18 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 import uvicorn
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 
+print("Starting backend server...")
+print(f"Frontend URL: {os.getenv('FRONTEND_URL')}")
+
 app.add_middleware(
     CORSMiddleware,
+    # get frontend_url from .env file
     allow_origins=[os.getenv("FRONTEND_URL")],
     allow_credentials=True,
     allow_methods=["*"],

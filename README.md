@@ -51,7 +51,7 @@ Upload your CV once, and let our AI assistant analyse your profile, find matchin
 5. **Job Tracker** – CRUD operations on Supabase tables with row‑level security (user_id = firebase_uid).
 6. **All API endpoints** are protected by Firebase token verification (`get_current_user` dependency).
 
->  The backend uses **Supabase (PostgreSQL + pgvector)** for all data – no SQLite, no local files.
+>  The backend uses **Supabase (PostgreSQL + pgvector)** for all data
 
 ---
 
@@ -72,8 +72,6 @@ Upload your CV once, and let our AI assistant analyse your profile, find matchin
 # CareerPilot – User Guide
 
 Welcome to **CareerPilot**! This guide walks you through every feature of the platform, from signing in to using the AI assistant and tracking your job applications.
-
-> **Screenshots** – Place your actual screenshots in the `docs/` folder and replace the placeholder image paths below.
 
 ---
 

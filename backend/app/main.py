@@ -25,7 +25,7 @@ async def preflight_handler(rest_of_path: str, request: Request):
         content={},
         headers={
             "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD",
             "Access-Control-Allow-Headers": "*",
             "Access-Control-Allow-Credentials": "true",
         },

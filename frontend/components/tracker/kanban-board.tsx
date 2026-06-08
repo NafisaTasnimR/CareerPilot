@@ -15,7 +15,6 @@ interface App {
   company: string
   role: string
   status: string
-
   applied_date?: string
   redirect_url?: string
   fit_score?: number
@@ -47,7 +46,7 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
   const [showForm, setShowForm] = useState(false)
   const [fCompany, setFCompany]   = useState('')
   const [fRole, setFRole]         = useState('')
-  
+  const [fNotes, setFNotes]       = useState('')
   const [fDeadline, setFDeadline] = useState('')
   const [fUrl, setFUrl]           = useState('')
 
@@ -76,7 +75,6 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
       headers,
       body: JSON.stringify({
         company: fCompany, role: fRole,
-       
         deadline: fDeadline || null,
         redirect_url: fUrl || null,
         status: 'Applied', source: 'manual',
@@ -84,7 +82,7 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
     })
     const created = await res.json()
     setApps(prev => [created, ...prev])
-    setFCompany(''); setFRole('');  setFDeadline(''); setFUrl('')
+    setFCompany(''); setFRole(''); setFNotes(''); setFDeadline(''); setFUrl('')
     setShowForm(false)
   }
 
@@ -110,7 +108,6 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
     if (detailApp?.id === appId) setDetailApp(null)
   }
 
-  
   const generateCoverLetter = async (app: App, force = false) => {
     setClApp(app)
     if (app.cover_letter && !force) {
@@ -133,11 +130,11 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
     setClLoading(false)
   }
 
-  const openGmailCompose = (app: App, coverLetter: string) => {
-    const subject = encodeURIComponent(`Application for ${app.role}`)
+  const openGmailCompose = (app: App | null, coverLetter: string) => {
+    if (!app) return
+    const subject = encodeURIComponent(`Application for ${app.role} at ${app.company}`)
     const body = encodeURIComponent(coverLetter)
-    
-    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`, '_blank')
+    window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${body}`, '_blank')
   }
 
   if (loading) return <p style={{ color: '#6b7280', padding: 16 }}>Loading applications...</p>
@@ -146,7 +143,9 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
     <div>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-       
+        <p style={{ color: '#6b7280', fontSize: 13, margin: 0 }}>
+          {apps.length} total · {apps.filter(a => a.source !== 'manual').length} from Job Hunter · {apps.filter(a => a.source === 'manual').length} manual
+        </p>
         <button
           onClick={() => setShowForm(v => !v)}
           style={{ padding: '8px 16px', background: 'white', color: 'black', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
@@ -164,12 +163,12 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
               style={{ background: '#111', color: 'white', border: '1px solid #333', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
             <input value={fRole} onChange={e => setFRole(e.target.value)} placeholder="Role / position *"
               style={{ background: '#111', color: 'white', border: '1px solid #333', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
-           
+            <input value={fNotes} onChange={e => setFNotes(e.target.value)} placeholder="Notes (optional)"
+              style={{ background: '#111', color: 'white', border: '1px solid #333', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
             <input value={fUrl} onChange={e => setFUrl(e.target.value)} placeholder="Job URL (optional)"
               style={{ background: '#111', color: 'white', border: '1px solid #333', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
-            {/* FIX 2: colorScheme: 'dark' makes the calendar picker icon visible on dark backgrounds */}
             <input type="date" value={fDeadline} onChange={e => setFDeadline(e.target.value)}
-              style={{ background: '#111', color: 'white', border: '1px solid #333', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none', colorScheme: 'dark' }} />
+              style={{ background: '#111', color: 'white', border: '1px solid #333', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button onClick={() => setShowForm(false)}
@@ -292,7 +291,7 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
                     <span style={{ color: 'white', fontSize: 12 }}>{detailApp.fit_score}%</span>
                   </div>
                 )}
-               
+
               </div>
 
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -350,7 +349,7 @@ export default function KanbanBoard({ userId = '', api = 'http://localhost:8000'
                 style={{ padding: '8px 14px', background: 'rgba(59,130,246,0.15)', color: 'rgb(147,197,253)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
                 Copy
               </button>
-              <button onClick={() => openGmailCompose(clApp, clText)} disabled={clLoading || !clText}
+              <button onClick={() => clApp && openGmailCompose(clApp, clText)} disabled={clLoading || !clText}
                 style={{ padding: '8px 16px', background: 'white', color: 'black', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                 ✉ Open in Gmail →
               </button>
